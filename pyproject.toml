@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "python-eveonline"
@@ -15,7 +15,6 @@ authors = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -28,6 +27,17 @@ dependencies = [
     "aiohttp>=3.9.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.0",
+    "aioresponses>=0.7",
+    "mypy>=1.8",
+    "pylint>=3.0",
+    "ruff>=0.3",
+]
+
 [project.urls]
 Homepage = "https://github.com/ronaldvdmeer/python-eveonline"
 Repository = "https://github.com/ronaldvdmeer/python-eveonline"
@@ -38,3 +48,137 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 eveonline = ["py.typed"]
+
+# -- pytest ------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = [
+    "--cov=eveonline",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-fail-under=90",
+    "-v",
+]
+
+# -- coverage ----------------------------------------------------------------
+[tool.coverage.run]
+source = ["src/eveonline"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "raise NotImplementedError",
+]
+show_missing = true
+
+# -- mypy --------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
+show_error_codes = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+strict = false
+
+[[tool.mypy.overrides]]
+module = "examples.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "aioresponses.*"
+ignore_missing_imports = true
+
+# -- ruff --------------------------------------------------------------------
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "N",      # pep8-naming
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "A",      # flake8-builtins
+    "C4",     # flake8-comprehensions
+    "DTZ",    # flake8-datetimez
+    "T20",    # flake8-print
+    "SIM",    # flake8-simplify
+    "TC",     # flake8-type-checking
+    "RUF",    # ruff-specific rules
+    "D",      # pydocstyle
+    "ANN",    # flake8-annotations
+    "S",      # flake8-bandit (security)
+    "PT",     # flake8-pytest-style
+]
+ignore = [
+    "D100",   # Missing docstring in public module (handled per-file)
+    "D104",   # Missing docstring in public package
+    "D203",   # 1 blank line before class docstring (conflicts with D211)
+    "D213",   # Multi-line docstring summary on second line (conflicts with D212)
+    "ANN401", # Allow Any for JSON responses and kwargs passthrough
+    "S101",   # Use of assert (needed in tests)
+    "TC001",  # Move application import into TYPE_CHECKING block
+    "TC002",  # Move third-party import into TYPE_CHECKING block
+    "TC003",  # Move stdlib import into TYPE_CHECKING block
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "D",      # No docstring requirements in tests
+    "ANN",    # No annotation requirements in tests
+    "S101",   # Allow assert in tests
+    "S105",   # Allow hardcoded strings in tests
+    "S106",   # Allow hardcoded passwords in tests
+    "S107",   # Allow hardcoded passwords in test defaults
+    "T20",    # Allow print in tests
+]
+"examples/**/*.py" = [
+    "D",      # No docstring requirements in examples
+    "T20",    # Allow print in examples
+    "ANN",    # No annotation requirements in examples
+]
+"src/eveonline/const.py" = [
+    "S105",   # SSO_TOKEN_URL is a URL, not a password
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+# -- pylint ------------------------------------------------------------------
+[tool.pylint.main]
+py-version = "3.11"
+load-plugins = ["pylint.extensions.code_style"]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint."messages control"]
+disable = [
+    "too-few-public-methods",
+    "too-many-instance-attributes",
+    "duplicate-code",
+]
+
+[tool.pylint.design]
+max-args = 10

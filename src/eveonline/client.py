@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
+from typing import Any
 
 from aiohttp import ClientSession
 
@@ -86,9 +87,7 @@ class EveOnlineClient:
     # Internal helpers
     # -------------------------------------------------------------------------
 
-    async def _request(
-        self, method: str, path: str, *, authenticated: bool = False, **kwargs: object
-    ) -> dict | list | float:
+    async def _request(self, method: str, path: str, *, authenticated: bool = False, **kwargs: Any) -> Any:
         """Make a request to the ESI API.
 
         Args:
@@ -108,7 +107,7 @@ class EveOnlineClient:
             EveOnlineNotFoundError: If the resource is not found.
             EveOnlineError: For other ESI API errors.
         """
-        params = dict(kwargs.pop("params", {}) or {})  # type: ignore[arg-type]
+        params: dict[str, Any] = dict(kwargs.pop("params", {}) or {})
         params.setdefault("datasource", ESI_DATASOURCE)
 
         try:
@@ -116,7 +115,7 @@ class EveOnlineClient:
                 if self._auth is None:
                     msg = "Authentication required but no auth provider configured"
                     raise EveOnlineAuthenticationError(msg)
-                response = await self._auth.request(method, path, params=params, **kwargs)  # type: ignore[arg-type]
+                response = await self._auth.request(method, path, params=params, **kwargs)
             else:
                 response = await self._session.request(
                     method,
@@ -130,7 +129,7 @@ class EveOnlineClient:
             msg = f"Failed to connect to ESI API: {err}"
             raise EveOnlineConnectionError(msg) from err
 
-        if response.status == 401 or response.status == 403:
+        if response.status in (401, 403):
             text = await response.text()
             msg = f"Authentication failed ({response.status}): {text}"
             raise EveOnlineAuthenticationError(msg)
@@ -139,11 +138,9 @@ class EveOnlineClient:
             msg = f"Resource not found: {path}"
             raise EveOnlineNotFoundError(msg)
 
-        if response.status == 420 or response.status == 429:
+        if response.status in (420, 429):
             retry_after = response.headers.get("Retry-After")
-            raise EveOnlineRateLimitError(
-                retry_after=int(retry_after) if retry_after else None
-            )
+            raise EveOnlineRateLimitError(retry_after=int(retry_after) if retry_after else None)
 
         if response.status >= 400:
             text = await response.text()
@@ -172,15 +169,13 @@ class EveOnlineClient:
         """
         data = await self._request("GET", "status/")
         return ServerStatus(
-            players=data["players"],  # type: ignore[index]
-            server_version=data["server_version"],  # type: ignore[index]
-            start_time=self._parse_datetime(data["start_time"]),  # type: ignore[arg-type, index]
-            vip=data.get("vip"),  # type: ignore[union-attr]
+            players=data["players"],
+            server_version=data["server_version"],
+            start_time=datetime.fromisoformat(data["start_time"].replace("Z", "+00:00")),
+            vip=data.get("vip"),
         )
 
-    async def async_get_character_public(
-        self, character_id: int
-    ) -> CharacterPublicInfo:
+    async def async_get_character_public(self, character_id: int) -> CharacterPublicInfo:
         """Get public information about a character.
 
         Args:
@@ -192,23 +187,21 @@ class EveOnlineClient:
         data = await self._request("GET", f"characters/{character_id}/")
         return CharacterPublicInfo(
             character_id=character_id,
-            name=data["name"],  # type: ignore[index]
-            corporation_id=data["corporation_id"],  # type: ignore[index]
-            birthday=self._parse_datetime(data["birthday"]),  # type: ignore[arg-type, index]
-            gender=data["gender"],  # type: ignore[index]
-            race_id=data["race_id"],  # type: ignore[index]
-            bloodline_id=data["bloodline_id"],  # type: ignore[index]
-            ancestry_id=data.get("ancestry_id"),  # type: ignore[union-attr]
-            alliance_id=data.get("alliance_id"),  # type: ignore[union-attr]
-            faction_id=data.get("faction_id"),  # type: ignore[union-attr]
-            description=data.get("description"),  # type: ignore[union-attr]
-            title=data.get("title"),  # type: ignore[union-attr]
-            security_status=data.get("security_status"),  # type: ignore[union-attr]
+            name=data["name"],
+            corporation_id=data["corporation_id"],
+            birthday=datetime.fromisoformat(data["birthday"].replace("Z", "+00:00")),
+            gender=data["gender"],
+            race_id=data["race_id"],
+            bloodline_id=data["bloodline_id"],
+            ancestry_id=data.get("ancestry_id"),
+            alliance_id=data.get("alliance_id"),
+            faction_id=data.get("faction_id"),
+            description=data.get("description"),
+            title=data.get("title"),
+            security_status=data.get("security_status"),
         )
 
-    async def async_get_character_portrait(
-        self, character_id: int
-    ) -> CharacterPortrait:
+    async def async_get_character_portrait(self, character_id: int) -> CharacterPortrait:
         """Get a character's portrait URLs.
 
         Args:
@@ -219,15 +212,13 @@ class EveOnlineClient:
         """
         data = await self._request("GET", f"characters/{character_id}/portrait/")
         return CharacterPortrait(
-            px64x64=data.get("px64x64"),  # type: ignore[union-attr]
-            px128x128=data.get("px128x128"),  # type: ignore[union-attr]
-            px256x256=data.get("px256x256"),  # type: ignore[union-attr]
-            px512x512=data.get("px512x512"),  # type: ignore[union-attr]
+            px64x64=data.get("px64x64"),
+            px128x128=data.get("px128x128"),
+            px256x256=data.get("px256x256"),
+            px512x512=data.get("px512x512"),
         )
 
-    async def async_get_corporation_public(
-        self, corporation_id: int
-    ) -> CorporationPublicInfo:
+    async def async_get_corporation_public(self, corporation_id: int) -> CorporationPublicInfo:
         """Get public information about a corporation.
 
         Args:
@@ -239,15 +230,15 @@ class EveOnlineClient:
         data = await self._request("GET", f"corporations/{corporation_id}/")
         return CorporationPublicInfo(
             corporation_id=corporation_id,
-            name=data["name"],  # type: ignore[index]
-            ticker=data["ticker"],  # type: ignore[index]
-            member_count=data["member_count"],  # type: ignore[index]
-            ceo_id=data["ceo_id"],  # type: ignore[index]
-            tax_rate=data["tax_rate"],  # type: ignore[index]
-            alliance_id=data.get("alliance_id"),  # type: ignore[union-attr]
-            description=data.get("description"),  # type: ignore[union-attr]
-            date_founded=self._parse_datetime(data.get("date_founded")),  # type: ignore[union-attr]
-            url=data.get("url"),  # type: ignore[union-attr]
+            name=data["name"],
+            ticker=data["ticker"],
+            member_count=data["member_count"],
+            ceo_id=data["ceo_id"],
+            tax_rate=data["tax_rate"],
+            alliance_id=data.get("alliance_id"),
+            description=data.get("description"),
+            date_founded=self._parse_datetime(data.get("date_founded")),
+            url=data.get("url"),
         )
 
     async def async_resolve_names(self, ids: list[int]) -> list[UniverseName]:
@@ -269,16 +260,14 @@ class EveOnlineClient:
                 name=entry["name"],
                 category=entry["category"],
             )
-            for entry in data  # type: ignore[union-attr]
+            for entry in data
         ]
 
     # -------------------------------------------------------------------------
     # Authenticated endpoints (auth required)
     # -------------------------------------------------------------------------
 
-    async def async_get_character_online(
-        self, character_id: int
-    ) -> CharacterOnlineStatus:
+    async def async_get_character_online(self, character_id: int) -> CharacterOnlineStatus:
         """Get a character's online status.
 
         Requires scope: ``esi-location.read_online.v1``
@@ -289,19 +278,15 @@ class EveOnlineClient:
         Returns:
             CharacterOnlineStatus with online flag and login/logout times.
         """
-        data = await self._request(
-            "GET", f"characters/{character_id}/online/", authenticated=True
-        )
+        data = await self._request("GET", f"characters/{character_id}/online/", authenticated=True)
         return CharacterOnlineStatus(
-            online=data["online"],  # type: ignore[index]
-            last_login=self._parse_datetime(data.get("last_login")),  # type: ignore[union-attr]
-            last_logout=self._parse_datetime(data.get("last_logout")),  # type: ignore[union-attr]
-            logins=data.get("logins"),  # type: ignore[union-attr]
+            online=data["online"],
+            last_login=self._parse_datetime(data.get("last_login")),
+            last_logout=self._parse_datetime(data.get("last_logout")),
+            logins=data.get("logins"),
         )
 
-    async def async_get_character_location(
-        self, character_id: int
-    ) -> CharacterLocation:
+    async def async_get_character_location(self, character_id: int) -> CharacterLocation:
         """Get a character's current location.
 
         Requires scope: ``esi-location.read_location.v1``
@@ -312,13 +297,11 @@ class EveOnlineClient:
         Returns:
             CharacterLocation with solar system, station, or structure ID.
         """
-        data = await self._request(
-            "GET", f"characters/{character_id}/location/", authenticated=True
-        )
+        data = await self._request("GET", f"characters/{character_id}/location/", authenticated=True)
         return CharacterLocation(
-            solar_system_id=data["solar_system_id"],  # type: ignore[index]
-            station_id=data.get("station_id"),  # type: ignore[union-attr]
-            structure_id=data.get("structure_id"),  # type: ignore[union-attr]
+            solar_system_id=data["solar_system_id"],
+            station_id=data.get("station_id"),
+            structure_id=data.get("structure_id"),
         )
 
     async def async_get_character_ship(self, character_id: int) -> CharacterShip:
@@ -332,13 +315,11 @@ class EveOnlineClient:
         Returns:
             CharacterShip with ship type, item ID, and name.
         """
-        data = await self._request(
-            "GET", f"characters/{character_id}/ship/", authenticated=True
-        )
+        data = await self._request("GET", f"characters/{character_id}/ship/", authenticated=True)
         return CharacterShip(
-            ship_type_id=data["ship_type_id"],  # type: ignore[index]
-            ship_item_id=data["ship_item_id"],  # type: ignore[index]
-            ship_name=data["ship_name"],  # type: ignore[index]
+            ship_type_id=data["ship_type_id"],
+            ship_item_id=data["ship_item_id"],
+            ship_name=data["ship_name"],
         )
 
     async def async_get_wallet_balance(self, character_id: int) -> WalletBalance:
@@ -352,15 +333,11 @@ class EveOnlineClient:
         Returns:
             WalletBalance with ISK balance.
         """
-        data = await self._request(
-            "GET", f"characters/{character_id}/wallet/", authenticated=True
-        )
+        data = await self._request("GET", f"characters/{character_id}/wallet/", authenticated=True)
         # Wallet endpoint returns a raw float, not a JSON object
-        return WalletBalance(balance=float(data))  # type: ignore[arg-type]
+        return WalletBalance(balance=float(data))
 
-    async def async_get_skill_queue(
-        self, character_id: int
-    ) -> list[SkillQueueEntry]:
+    async def async_get_skill_queue(self, character_id: int) -> list[SkillQueueEntry]:
         """Get a character's skill training queue.
 
         Requires scope: ``esi-skills.read_skillqueue.v1``
@@ -371,9 +348,7 @@ class EveOnlineClient:
         Returns:
             List of SkillQueueEntry, ordered by queue_position.
         """
-        data = await self._request(
-            "GET", f"characters/{character_id}/skillqueue/", authenticated=True
-        )
+        data = await self._request("GET", f"characters/{character_id}/skillqueue/", authenticated=True)
         return [
             SkillQueueEntry(
                 skill_id=entry["skill_id"],
@@ -385,5 +360,5 @@ class EveOnlineClient:
                 level_start_sp=entry.get("level_start_sp"),
                 level_end_sp=entry.get("level_end_sp"),
             )
-            for entry in data  # type: ignore[union-attr]
+            for entry in data
         ]

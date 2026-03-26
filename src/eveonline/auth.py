@@ -1,6 +1,9 @@
 """Abstract authentication for the Eve Online ESI API."""
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from typing import Any
 
 from aiohttp import ClientResponse, ClientSession
 
@@ -42,9 +45,7 @@ class AbstractAuth(ABC):
     async def async_get_access_token(self) -> str:
         """Return a valid access token for the ESI API."""
 
-    async def request(
-        self, method: str, path: str, **kwargs: object
-    ) -> ClientResponse:
+    async def request(self, method: str, path: str, **kwargs: Any) -> ClientResponse:
         """Make an authenticated request to the ESI API.
 
         Args:
@@ -55,7 +56,7 @@ class AbstractAuth(ABC):
         Returns:
             The aiohttp ClientResponse.
         """
-        headers: dict[str, str] = dict(kwargs.pop("headers", {}) or {})  # type: ignore[arg-type]
+        headers: dict[str, str] = dict(kwargs.pop("headers", {}) or {})
         access_token = await self.async_get_access_token()
         headers["authorization"] = f"Bearer {access_token}"
 
