@@ -15,6 +15,11 @@ from eveonline.models import (
     CharacterLocation,
     CharacterOnlineStatus,
     CharacterShip,
+    CharacterSkillsSummary,
+    IndustryJob,
+    JumpFatigue,
+    MailLabelsSummary,
+    MarketOrder,
     SkillQueueEntry,
     WalletBalance,
 )
@@ -69,6 +74,46 @@ class TestAuthRequired:
             client = EveOnlineClient(session=session)
             with pytest.raises(EveOnlineAuthenticationError):
                 await client.async_get_skill_queue(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_skills_without_auth_raises(self):
+        """Calling skills endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_skills(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_mail_labels_without_auth_raises(self):
+        """Calling mail labels endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_mail_labels(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_industry_jobs_without_auth_raises(self):
+        """Calling industry jobs endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_industry_jobs(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_market_orders_without_auth_raises(self):
+        """Calling market orders endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_market_orders(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_jump_fatigue_without_auth_raises(self):
+        """Calling jump fatigue endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_jump_fatigue(CHARACTER_ID)
 
 
 class TestCharacterOnline:
@@ -334,3 +379,231 @@ class TestSkillQueue:
         assert queue[0].start_date is None
         assert queue[0].finish_date is None
         assert queue[0].training_start_sp is None
+
+
+class TestSkills:
+    """Test GET /characters/{character_id}/skills/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_skills_success(self, character_skills_data):
+        """Successful skills summary fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/skills/?datasource=tranquility",
+                payload=character_skills_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                skills = await client.async_get_skills(CHARACTER_ID)
+
+        assert isinstance(skills, CharacterSkillsSummary)
+        assert skills.total_sp == 48500000
+        assert skills.unallocated_sp == 150000
+
+    @pytest.mark.asyncio
+    async def test_get_skills_no_unallocated(self):
+        """Skills when unallocated_sp is missing defaults to 0."""
+        data = {"total_sp": 10000000, "skills": []}
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/skills/?datasource=tranquility",
+                payload=data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                skills = await client.async_get_skills(CHARACTER_ID)
+
+        assert skills.total_sp == 10000000
+        assert skills.unallocated_sp == 0
+
+
+class TestMailLabels:
+    """Test GET /characters/{character_id}/mail/labels/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_mail_labels_success(self, mail_labels_data):
+        """Successful mail labels fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/mail/labels/?datasource=tranquility",
+                payload=mail_labels_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                labels = await client.async_get_mail_labels(CHARACTER_ID)
+
+        assert isinstance(labels, MailLabelsSummary)
+        assert labels.total_unread_count == 7
+
+    @pytest.mark.asyncio
+    async def test_get_mail_labels_no_unread(self):
+        """Mail labels when no unread mail."""
+        data = {"total_unread_count": 0, "labels": []}
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/mail/labels/?datasource=tranquility",
+                payload=data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                labels = await client.async_get_mail_labels(CHARACTER_ID)
+
+        assert labels.total_unread_count == 0
+
+
+class TestIndustryJobs:
+    """Test GET /characters/{character_id}/industry/jobs/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_industry_jobs_success(self, industry_jobs_data):
+        """Successful industry jobs fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/industry/jobs/?datasource=tranquility",
+                payload=industry_jobs_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                jobs = await client.async_get_industry_jobs(CHARACTER_ID)
+
+        assert len(jobs) == 2
+        assert all(isinstance(j, IndustryJob) for j in jobs)
+
+        first = jobs[0]
+        assert first.job_id == 12345
+        assert first.activity_id == 1
+        assert first.status == "active"
+        assert first.blueprint_type_id == 1137
+        assert first.runs == 10
+        assert first.cost == 1500.50
+        assert first.start_date == datetime(2026, 3, 25, 10, 0, tzinfo=UTC)
+        assert first.end_date == datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
+
+        second = jobs[1]
+        assert second.product_type_id is None
+        assert second.cost is None
+
+    @pytest.mark.asyncio
+    async def test_get_industry_jobs_include_completed(self):
+        """Industry jobs with include_completed parameter."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/industry/jobs/"
+                "?datasource=tranquility&include_completed=true",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                jobs = await client.async_get_industry_jobs(CHARACTER_ID, include_completed=True)
+
+        assert jobs == []
+
+    @pytest.mark.asyncio
+    async def test_get_industry_jobs_empty(self):
+        """No active industry jobs returns empty list."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/industry/jobs/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                jobs = await client.async_get_industry_jobs(CHARACTER_ID)
+
+        assert jobs == []
+
+
+class TestMarketOrders:
+    """Test GET /characters/{character_id}/orders/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_market_orders_success(self, market_orders_data):
+        """Successful market orders fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/orders/?datasource=tranquility",
+                payload=market_orders_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                orders = await client.async_get_market_orders(CHARACTER_ID)
+
+        assert len(orders) == 2
+        assert all(isinstance(o, MarketOrder) for o in orders)
+
+        sell = orders[0]
+        assert sell.order_id == 9876543
+        assert sell.is_buy_order is False
+        assert sell.price == 5.50
+        assert sell.volume_remain == 100000
+        assert sell.volume_total == 500000
+        assert sell.duration == 90
+        assert sell.range == "region"
+        assert sell.issued == datetime(2026, 3, 20, 12, 0, tzinfo=UTC)
+
+        buy = orders[1]
+        assert buy.is_buy_order is True
+        assert buy.price == 10.00
+        assert buy.min_volume is None
+
+    @pytest.mark.asyncio
+    async def test_get_market_orders_empty(self):
+        """No active market orders returns empty list."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/orders/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                orders = await client.async_get_market_orders(CHARACTER_ID)
+
+        assert orders == []
+
+
+class TestJumpFatigue:
+    """Test GET /characters/{character_id}/fatigue/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_jump_fatigue_success(self, jump_fatigue_data):
+        """Successful jump fatigue fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/fatigue/?datasource=tranquility",
+                payload=jump_fatigue_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                fatigue = await client.async_get_jump_fatigue(CHARACTER_ID)
+
+        assert isinstance(fatigue, JumpFatigue)
+        assert fatigue.jump_fatigue_expire_date == datetime(2026, 3, 27, 15, 30, tzinfo=UTC)
+        assert fatigue.last_jump_date == datetime(2026, 3, 26, 12, 0, tzinfo=UTC)
+        assert fatigue.last_update_date == datetime(2026, 3, 26, 12, 0, tzinfo=UTC)
+
+    @pytest.mark.asyncio
+    async def test_get_jump_fatigue_no_fatigue(self):
+        """Character with no jump fatigue (all fields empty)."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/fatigue/?datasource=tranquility",
+                payload={},
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                fatigue = await client.async_get_jump_fatigue(CHARACTER_ID)
+
+        assert fatigue.jump_fatigue_expire_date is None
+        assert fatigue.last_jump_date is None
+        assert fatigue.last_update_date is None

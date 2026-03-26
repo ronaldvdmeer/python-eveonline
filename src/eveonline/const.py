@@ -22,6 +22,10 @@ SCOPE_READ_KILLMAILS: Final = "esi-killmails.read_killmails.v1"
 SCOPE_READ_CLONES: Final = "esi-clones.read_clones.v1"
 SCOPE_READ_IMPLANTS: Final = "esi-clones.read_implants.v1"
 SCOPE_READ_NOTIFICATIONS: Final = "esi-characters.read_notifications.v1"
+SCOPE_READ_FATIGUE: Final = "esi-characters.read_fatigue.v1"
+SCOPE_READ_MAIL: Final = "esi-mail.read_mail.v1"
+SCOPE_READ_INDUSTRY_JOBS: Final = "esi-industry.read_character_jobs.v1"
+SCOPE_READ_MARKET_ORDERS: Final = "esi-markets.read_character_orders.v1"
 
 # Default scopes for a typical Home Assistant integration
 DEFAULT_SCOPES: Final = [
@@ -31,4 +35,8 @@ DEFAULT_SCOPES: Final = [
     SCOPE_READ_WALLET,
     SCOPE_READ_SKILLS,
     SCOPE_READ_SKILLQUEUE,
+    SCOPE_READ_FATIGUE,
+    SCOPE_READ_MAIL,
+    SCOPE_READ_INDUSTRY_JOBS,
+    SCOPE_READ_MARKET_ORDERS,
 ]

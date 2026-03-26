@@ -117,3 +117,62 @@ class UniverseName:
     id: int
     name: str
     category: str
+
+
+@dataclass(frozen=True)
+class CharacterSkillsSummary:
+    """Character skills summary (requires auth)."""
+
+    total_sp: int
+    unallocated_sp: int
+
+
+@dataclass(frozen=True)
+class MailLabelsSummary:
+    """Mail labels with unread count (requires auth)."""
+
+    total_unread_count: int
+
+
+@dataclass(frozen=True)
+class IndustryJob:
+    """An active industry job (requires auth)."""
+
+    job_id: int
+    activity_id: int
+    status: str
+    start_date: datetime
+    end_date: datetime
+    blueprint_type_id: int
+    output_location_id: int
+    runs: int
+    product_type_id: int | None = None
+    facility_id: int | None = None
+    cost: float | None = None
+
+
+@dataclass(frozen=True)
+class MarketOrder:
+    """A character's market order (requires auth)."""
+
+    order_id: int
+    type_id: int
+    is_buy_order: bool
+    price: float
+    volume_remain: int
+    volume_total: int
+    location_id: int
+    region_id: int
+    issued: datetime
+    duration: int
+    range: str
+    min_volume: int | None = None
+
+
+@dataclass(frozen=True)
+class JumpFatigue:
+    """Character jump fatigue information (requires auth)."""
+
+    jump_fatigue_expire_date: datetime | None = None
+    last_jump_date: datetime | None = None
+    last_update_date: datetime | None = None

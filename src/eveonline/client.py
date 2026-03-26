@@ -22,7 +22,12 @@ from .models import (
     CharacterPortrait,
     CharacterPublicInfo,
     CharacterShip,
+    CharacterSkillsSummary,
     CorporationPublicInfo,
+    IndustryJob,
+    JumpFatigue,
+    MailLabelsSummary,
+    MarketOrder,
     ServerStatus,
     SkillQueueEntry,
     UniverseName,
@@ -362,3 +367,119 @@ class EveOnlineClient:
             )
             for entry in data
         ]
+
+    async def async_get_skills(self, character_id: int) -> CharacterSkillsSummary:
+        """Get a character's total and unallocated skill points.
+
+        Requires scope: ``esi-skills.read_skills.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            CharacterSkillsSummary with total SP and unallocated SP.
+        """
+        data = await self._request("GET", f"characters/{character_id}/skills/", authenticated=True)
+        return CharacterSkillsSummary(
+            total_sp=data["total_sp"],
+            unallocated_sp=data.get("unallocated_sp", 0),
+        )
+
+    async def async_get_mail_labels(self, character_id: int) -> MailLabelsSummary:
+        """Get a character's mail labels with unread counts.
+
+        Requires scope: ``esi-mail.read_mail.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            MailLabelsSummary with total unread count.
+        """
+        data = await self._request("GET", f"characters/{character_id}/mail/labels/", authenticated=True)
+        return MailLabelsSummary(
+            total_unread_count=data.get("total_unread_count", 0),
+        )
+
+    async def async_get_industry_jobs(self, character_id: int, *, include_completed: bool = False) -> list[IndustryJob]:
+        """Get a character's industry jobs.
+
+        Requires scope: ``esi-industry.read_character_jobs.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+            include_completed: Whether to include completed jobs.
+
+        Returns:
+            List of IndustryJob entries.
+        """
+        params: dict[str, str] = {}
+        if include_completed:
+            params["include_completed"] = "true"
+        data = await self._request(
+            "GET", f"characters/{character_id}/industry/jobs/", authenticated=True, params=params
+        )
+        return [
+            IndustryJob(
+                job_id=entry["job_id"],
+                activity_id=entry["activity_id"],
+                status=entry["status"],
+                start_date=datetime.fromisoformat(entry["start_date"].replace("Z", "+00:00")),
+                end_date=datetime.fromisoformat(entry["end_date"].replace("Z", "+00:00")),
+                blueprint_type_id=entry["blueprint_type_id"],
+                output_location_id=entry["output_location_id"],
+                runs=entry["runs"],
+                product_type_id=entry.get("product_type_id"),
+                facility_id=entry.get("facility_id"),
+                cost=entry.get("cost"),
+            )
+            for entry in data
+        ]
+
+    async def async_get_market_orders(self, character_id: int) -> list[MarketOrder]:
+        """Get a character's open market orders.
+
+        Requires scope: ``esi-markets.read_character_orders.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            List of MarketOrder entries.
+        """
+        data = await self._request("GET", f"characters/{character_id}/orders/", authenticated=True)
+        return [
+            MarketOrder(
+                order_id=entry["order_id"],
+                type_id=entry["type_id"],
+                is_buy_order=entry.get("is_buy_order", False),
+                price=entry["price"],
+                volume_remain=entry["volume_remain"],
+                volume_total=entry["volume_total"],
+                location_id=entry["location_id"],
+                region_id=entry["region_id"],
+                issued=datetime.fromisoformat(entry["issued"].replace("Z", "+00:00")),
+                duration=entry["duration"],
+                range=entry["range"],
+                min_volume=entry.get("min_volume"),
+            )
+            for entry in data
+        ]
+
+    async def async_get_jump_fatigue(self, character_id: int) -> JumpFatigue:
+        """Get a character's jump fatigue information.
+
+        Requires scope: ``esi-characters.read_fatigue.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            JumpFatigue with expiry date and last jump info.
+        """
+        data = await self._request("GET", f"characters/{character_id}/fatigue/", authenticated=True)
+        return JumpFatigue(
+            jump_fatigue_expire_date=self._parse_datetime(data.get("jump_fatigue_expire_date")),
+            last_jump_date=self._parse_datetime(data.get("last_jump_date")),
+            last_update_date=self._parse_datetime(data.get("last_update_date")),
+        )

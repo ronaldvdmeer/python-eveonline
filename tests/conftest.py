@@ -167,3 +167,101 @@ def skill_queue_data():
             "level_end_sp": 45255,
         },
     ]
+
+
+@pytest.fixture
+def character_skills_data():
+    """Mock response for GET /characters/{character_id}/skills/."""
+    return {
+        "total_sp": 48500000,
+        "unallocated_sp": 150000,
+        "skills": [
+            {"skill_id": 3435, "trained_skill_level": 5, "skillpoints_in_skill": 256000, "active_skill_level": 5},
+        ],
+    }
+
+
+@pytest.fixture
+def mail_labels_data():
+    """Mock response for GET /characters/{character_id}/mail/labels/."""
+    return {
+        "total_unread_count": 7,
+        "labels": [
+            {"label_id": 1, "name": "Inbox", "color": "#ffffff", "unread_count": 5},
+            {"label_id": 2, "name": "Corp", "color": "#00ff00", "unread_count": 2},
+        ],
+    }
+
+
+@pytest.fixture
+def industry_jobs_data():
+    """Mock response for GET /characters/{character_id}/industry/jobs/."""
+    return [
+        {
+            "job_id": 12345,
+            "activity_id": 1,
+            "status": "active",
+            "start_date": "2026-03-25T10:00:00Z",
+            "end_date": "2026-03-27T10:00:00Z",
+            "blueprint_type_id": 1137,
+            "output_location_id": 60003760,
+            "runs": 10,
+            "product_type_id": 1137,
+            "facility_id": 60003760,
+            "cost": 1500.50,
+        },
+        {
+            "job_id": 12346,
+            "activity_id": 4,
+            "status": "active",
+            "start_date": "2026-03-24T08:00:00Z",
+            "end_date": "2026-03-26T20:00:00Z",
+            "blueprint_type_id": 11568,
+            "output_location_id": 60003760,
+            "runs": 1,
+        },
+    ]
+
+
+@pytest.fixture
+def market_orders_data():
+    """Mock response for GET /characters/{character_id}/orders/."""
+    return [
+        {
+            "order_id": 9876543,
+            "type_id": 34,
+            "is_buy_order": False,
+            "price": 5.50,
+            "volume_remain": 100000,
+            "volume_total": 500000,
+            "location_id": 60003760,
+            "region_id": 10000002,
+            "issued": "2026-03-20T12:00:00Z",
+            "duration": 90,
+            "range": "region",
+            "min_volume": 1,
+        },
+        {
+            "order_id": 9876544,
+            "type_id": 35,
+            "is_buy_order": True,
+            "price": 10.00,
+            "volume_remain": 50000,
+            "volume_total": 50000,
+            "location_id": 60003760,
+            "region_id": 10000002,
+            "issued": "2026-03-21T08:00:00Z",
+            "duration": 30,
+            "range": "station",
+        },
+    ]
+
+
+@pytest.fixture
+def jump_fatigue_data():
+    """Mock response for GET /characters/{character_id}/fatigue/."""
+    return {
+        "jump_fatigue_expire_date": "2026-03-27T15:30:00Z",
+        "last_jump_date": "2026-03-26T12:00:00Z",
+        "last_update_date": "2026-03-26T12:00:00Z",
+    }
