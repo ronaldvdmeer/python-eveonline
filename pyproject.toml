@@ -56,7 +56,6 @@ asyncio_mode = "auto"
 addopts = [
     "--cov=eveonline",
     "--cov-report=term-missing",
-    "--cov-report=html",
     "--cov-fail-under=90",
     "-v",
 ]
