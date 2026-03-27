@@ -6,9 +6,16 @@ from dataclasses import dataclass
 from datetime import datetime
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ServerStatus:
-    """EVE Online server (Tranquility) status."""
+    """EVE Online server (Tranquility) status.
+
+    Attributes:
+        players: Number of players currently online.
+        server_version: Current server build version string.
+        start_time: When the server was last started.
+        vip: Whether VIP mode is enabled, or ``None`` if not reported.
+    """
 
     players: int
     server_version: str
@@ -16,9 +23,25 @@ class ServerStatus:
     vip: bool | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CharacterPublicInfo:
-    """Public character information (no auth required)."""
+    """Public character information (no auth required).
+
+    Attributes:
+        character_id: The EVE character ID.
+        name: Character name.
+        corporation_id: Current corporation ID.
+        birthday: Character creation date.
+        gender: ``"male"`` or ``"female"``.
+        race_id: Numeric race identifier.
+        bloodline_id: Numeric bloodline identifier.
+        ancestry_id: Numeric ancestry identifier, if available.
+        alliance_id: Alliance ID, if the corporation is in an alliance.
+        faction_id: Faction ID, if enlisted in faction warfare.
+        description: Character bio / description.
+        title: Corporation title.
+        security_status: Current security status.
+    """
 
     character_id: int
     name: str
@@ -35,9 +58,16 @@ class CharacterPublicInfo:
     security_status: float | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CharacterPortrait:
-    """Character portrait URLs."""
+    """Character portrait URLs.
+
+    Attributes:
+        px64x64: URL for the 64x64 portrait.
+        px128x128: URL for the 128x128 portrait.
+        px256x256: URL for the 256x256 portrait.
+        px512x512: URL for the 512x512 portrait.
+    """
 
     px64x64: str | None = None
     px128x128: str | None = None
@@ -45,9 +75,22 @@ class CharacterPortrait:
     px512x512: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CorporationPublicInfo:
-    """Public corporation information (no auth required)."""
+    """Public corporation information (no auth required).
+
+    Attributes:
+        corporation_id: The EVE corporation ID.
+        name: Corporation name.
+        ticker: Short ticker string (e.g. ``"CCP"``).
+        member_count: Current number of members.
+        ceo_id: Character ID of the CEO.
+        tax_rate: Corporation tax rate (0.0-1.0).
+        alliance_id: Alliance ID, if any.
+        description: Corporation description.
+        date_founded: Date the corporation was founded.
+        url: Corporation website URL.
+    """
 
     corporation_id: int
     name: str
@@ -61,9 +104,16 @@ class CorporationPublicInfo:
     url: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CharacterOnlineStatus:
-    """Character online status (requires auth)."""
+    """Character online status (requires auth).
+
+    Attributes:
+        online: Whether the character is currently online.
+        last_login: Timestamp of the last login.
+        last_logout: Timestamp of the last logout.
+        logins: Total number of logins.
+    """
 
     online: bool
     last_login: datetime | None = None
@@ -71,34 +121,61 @@ class CharacterOnlineStatus:
     logins: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CharacterLocation:
-    """Character current location (requires auth)."""
+    """Character current location (requires auth).
+
+    Attributes:
+        solar_system_id: Current solar system ID.
+        station_id: NPC station ID, if docked.
+        structure_id: Player structure ID, if docked.
+    """
 
     solar_system_id: int
     station_id: int | None = None
     structure_id: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CharacterShip:
-    """Character current ship (requires auth)."""
+    """Character current ship (requires auth).
+
+    Attributes:
+        ship_type_id: Type ID of the ship.
+        ship_item_id: Unique item ID of the specific ship.
+        ship_name: Player-assigned name of the ship.
+    """
 
     ship_type_id: int
     ship_item_id: int
     ship_name: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class WalletBalance:
-    """Character wallet balance (requires auth)."""
+    """Character wallet balance (requires auth).
+
+    Attributes:
+        balance: ISK balance.
+    """
 
     balance: float
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SkillQueueEntry:
-    """A single skill in the training queue (requires auth)."""
+    """A single skill in the training queue (requires auth).
+
+    Attributes:
+        skill_id: Type ID of the skill being trained.
+        queue_position: Zero-based position in the queue.
+        finished_level: The level being trained to.
+        start_date: When training started.
+        finish_date: Estimated completion time.
+        training_start_sp: Skill points at training start.
+        level_start_sp: Skill points at the beginning of this level.
+        level_end_sp: Skill points required to finish this level.
+    """
 
     skill_id: int
     queue_position: int
@@ -110,33 +187,62 @@ class SkillQueueEntry:
     level_end_sp: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class UniverseName:
-    """Resolved ID → name mapping."""
+    """Resolved ID → name mapping.
+
+    Attributes:
+        id: The EVE entity ID.
+        name: Resolved display name.
+        category: Entity category (e.g. ``"character"``, ``"corporation"``).
+    """
 
     id: int
     name: str
     category: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class CharacterSkillsSummary:
-    """Character skills summary (requires auth)."""
+    """Character skills summary (requires auth).
+
+    Attributes:
+        total_sp: Total skill points earned.
+        unallocated_sp: Unallocated (free) skill points.
+    """
 
     total_sp: int
     unallocated_sp: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MailLabelsSummary:
-    """Mail labels with unread count (requires auth)."""
+    """Mail labels with unread count (requires auth).
+
+    Attributes:
+        total_unread_count: Total number of unread mail messages.
+    """
 
     total_unread_count: int
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class IndustryJob:
-    """An active industry job (requires auth)."""
+    """An active industry job (requires auth).
+
+    Attributes:
+        job_id: Unique job identifier.
+        activity_id: Industry activity type (1=manufacturing, etc.).
+        status: Job status string (``"active"``, ``"delivered"``, etc.).
+        start_date: When the job was started.
+        end_date: When the job will complete.
+        blueprint_type_id: Type ID of the blueprint used.
+        output_location_id: Location ID for the job output.
+        runs: Number of runs.
+        product_type_id: Type ID of the produced item, if applicable.
+        facility_id: Facility ID where the job runs.
+        cost: Installation cost in ISK.
+    """
 
     job_id: int
     activity_id: int
@@ -151,9 +257,24 @@ class IndustryJob:
     cost: float | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MarketOrder:
-    """A character's market order (requires auth)."""
+    """A character's market order (requires auth).
+
+    Attributes:
+        order_id: Unique order identifier.
+        type_id: Type ID of the item.
+        is_buy_order: ``True`` for buy orders, ``False`` for sell.
+        price: Price per unit in ISK.
+        volume_remain: Units remaining.
+        volume_total: Total units originally listed.
+        location_id: Station or structure ID.
+        region_id: Region the order is placed in.
+        issued: When the order was created or last updated.
+        duration: Order duration in days.
+        range: Order range string (e.g. ``"region"``, ``"station"``).
+        min_volume: Minimum purchase volume, if applicable.
+    """
 
     order_id: int
     type_id: int
@@ -169,9 +290,15 @@ class MarketOrder:
     min_volume: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class JumpFatigue:
-    """Character jump fatigue information (requires auth)."""
+    """Character jump fatigue information (requires auth).
+
+    Attributes:
+        jump_fatigue_expire_date: When jump fatigue expires.
+        last_jump_date: Timestamp of the last jump.
+        last_update_date: When this data was last updated.
+    """
 
     jump_fatigue_expire_date: datetime | None = None
     last_jump_date: datetime | None = None

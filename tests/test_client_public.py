@@ -155,6 +155,49 @@ class TestServerStatus:
                     await client.async_get_server_status()
                 assert exc_info.value.retry_after == 60
 
+    @pytest.mark.asyncio
+    async def test_rate_limit_no_retry_after_header(self):
+        """HTTP 429 without Retry-After header sets retry_after to None."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                status=429,
+            )
+            async with aiohttp.ClientSession() as session:
+                client = EveOnlineClient(session=session)
+                with pytest.raises(EveOnlineRateLimitError) as exc_info:
+                    await client.async_get_server_status()
+                assert exc_info.value.retry_after is None
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_non_numeric_retry_after(self):
+        """Non-numeric Retry-After (HTTP date) is treated as None."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                status=429,
+                headers={"Retry-After": "Thu, 01 Jan 2099 00:00:00 GMT"},
+            )
+            async with aiohttp.ClientSession() as session:
+                client = EveOnlineClient(session=session)
+                with pytest.raises(EveOnlineRateLimitError) as exc_info:
+                    await client.async_get_server_status()
+                assert exc_info.value.retry_after is None
+
+    @pytest.mark.asyncio
+    async def test_generic_400_error(self):
+        """HTTP 400 raises EveOnlineError with status and body."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                status=400,
+                body="Bad Request",
+            )
+            async with aiohttp.ClientSession() as session:
+                client = EveOnlineClient(session=session)
+                with pytest.raises(EveOnlineError, match=r"ESI API error.*400"):
+                    await client.async_get_server_status()
+
 
 class TestCharacterPublic:
     """Test GET /characters/{character_id}/ endpoint."""
@@ -328,3 +371,26 @@ class TestResolveNames:
         names = await client.async_resolve_names([])
         assert names == []
         mock_session.request.assert_not_called()
+
+
+class TestParseDatetime:
+    """Test the _parse_datetime static helper."""
+
+    def test_none_returns_none(self):
+        """None input returns None."""
+        assert EveOnlineClient._parse_datetime(None) is None
+
+    def test_iso_with_z_suffix(self):
+        """Z-terminated timestamps are parsed correctly (Python ≥3.11)."""
+        result = EveOnlineClient._parse_datetime("2026-03-26T11:00:00Z")
+        assert result == datetime(2026, 3, 26, 11, 0, tzinfo=UTC)
+
+    def test_iso_with_offset(self):
+        """Explicit +00:00 offset is handled."""
+        result = EveOnlineClient._parse_datetime("2026-03-26T11:00:00+00:00")
+        assert result == datetime(2026, 3, 26, 11, 0, tzinfo=UTC)
+
+    def test_invalid_value_raises(self):
+        """Non-ISO string raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid isoformat"):
+            EveOnlineClient._parse_datetime("not-a-date")

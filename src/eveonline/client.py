@@ -145,7 +145,13 @@ class EveOnlineClient:
 
         if response.status in (420, 429):
             retry_after = response.headers.get("Retry-After")
-            raise EveOnlineRateLimitError(retry_after=int(retry_after) if retry_after else None)
+            retry_after_seconds: int | None = None
+            if retry_after is not None:
+                try:
+                    retry_after_seconds = int(retry_after)
+                except ValueError:
+                    retry_after_seconds = None
+            raise EveOnlineRateLimitError(retry_after=retry_after_seconds)
 
         if response.status >= 400:
             text = await response.text()
@@ -156,11 +162,19 @@ class EveOnlineClient:
 
     @staticmethod
     def _parse_datetime(value: str | None) -> datetime | None:
-        """Parse an ISO8601 datetime string from ESI."""
+        """Parse an ISO 8601 datetime string from ESI.
+
+        Args:
+            value: An ISO 8601 string (e.g. ``"2025-01-15T12:34:56Z"``) or
+                ``None``.
+
+        Returns:
+            A timezone-aware :class:`~datetime.datetime`, or ``None`` when
+            *value* is ``None``.
+        """
         if value is None:
             return None
-        # ESI returns times like "2025-01-15T12:34:56Z"
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return datetime.fromisoformat(value)
 
     # -------------------------------------------------------------------------
     # Public endpoints (no auth required)
@@ -176,7 +190,7 @@ class EveOnlineClient:
         return ServerStatus(
             players=data["players"],
             server_version=data["server_version"],
-            start_time=datetime.fromisoformat(data["start_time"].replace("Z", "+00:00")),
+            start_time=datetime.fromisoformat(data["start_time"]),
             vip=data.get("vip"),
         )
 
@@ -194,7 +208,7 @@ class EveOnlineClient:
             character_id=character_id,
             name=data["name"],
             corporation_id=data["corporation_id"],
-            birthday=datetime.fromisoformat(data["birthday"].replace("Z", "+00:00")),
+            birthday=datetime.fromisoformat(data["birthday"]),
             gender=data["gender"],
             race_id=data["race_id"],
             bloodline_id=data["bloodline_id"],
@@ -424,8 +438,8 @@ class EveOnlineClient:
                 job_id=entry["job_id"],
                 activity_id=entry["activity_id"],
                 status=entry["status"],
-                start_date=datetime.fromisoformat(entry["start_date"].replace("Z", "+00:00")),
-                end_date=datetime.fromisoformat(entry["end_date"].replace("Z", "+00:00")),
+                start_date=datetime.fromisoformat(entry["start_date"]),
+                end_date=datetime.fromisoformat(entry["end_date"]),
                 blueprint_type_id=entry["blueprint_type_id"],
                 output_location_id=entry["output_location_id"],
                 runs=entry["runs"],
@@ -458,7 +472,7 @@ class EveOnlineClient:
                 volume_total=entry["volume_total"],
                 location_id=entry["location_id"],
                 region_id=entry["region_id"],
-                issued=datetime.fromisoformat(entry["issued"].replace("Z", "+00:00")),
+                issued=datetime.fromisoformat(entry["issued"]),
                 duration=entry["duration"],
                 range=entry["range"],
                 min_volume=entry.get("min_volume"),

@@ -1,5 +1,7 @@
 """Constants for the Eve Online ESI API."""
 
+from __future__ import annotations
+
 from typing import Final
 
 # ESI API
@@ -28,7 +30,7 @@ SCOPE_READ_INDUSTRY_JOBS: Final = "esi-industry.read_character_jobs.v1"
 SCOPE_READ_MARKET_ORDERS: Final = "esi-markets.read_character_orders.v1"
 
 # Default scopes for a typical Home Assistant integration
-DEFAULT_SCOPES: Final = [
+DEFAULT_SCOPES: Final = (
     SCOPE_READ_ONLINE,
     SCOPE_READ_LOCATION,
     SCOPE_READ_SHIP_TYPE,
@@ -39,4 +41,4 @@ DEFAULT_SCOPES: Final = [
     SCOPE_READ_MAIL,
     SCOPE_READ_INDUSTRY_JOBS,
     SCOPE_READ_MARKET_ORDERS,
-]
+)

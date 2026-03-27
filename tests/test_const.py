@@ -53,7 +53,7 @@ class TestConstants:
         assert SCOPE_READ_WALLET in DEFAULT_SCOPES
         assert SCOPE_READ_LOCATION in DEFAULT_SCOPES
 
-    def test_default_scopes_is_list(self):
-        """Default scopes is a list."""
-        assert isinstance(DEFAULT_SCOPES, list)
+    def test_default_scopes_is_tuple(self):
+        """Default scopes is an immutable tuple."""
+        assert isinstance(DEFAULT_SCOPES, tuple)
         assert len(DEFAULT_SCOPES) > 0

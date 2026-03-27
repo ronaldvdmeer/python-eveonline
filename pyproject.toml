@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "python-eveonline"
-version = "0.2.1"
+version = "0.2.2"
 description = "Async Python client for the Eve Online ESI API"
 readme = "README.md"
 license = "MIT"

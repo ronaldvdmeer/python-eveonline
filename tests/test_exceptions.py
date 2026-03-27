@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import eveonline
 from eveonline.exceptions import (
     EveOnlineAuthenticationError,
     EveOnlineConnectionError,
@@ -61,3 +62,12 @@ class TestRateLimitError:
         err = EveOnlineRateLimitError(retry_after=None)
         assert err.retry_after is None
         assert "retry after" not in str(err)
+
+
+class TestTopLevelExports:
+    """Verify all exceptions are accessible from the package root."""
+
+    def test_not_found_error_exported(self):
+        """EveOnlineNotFoundError is importable from eveonline."""
+        assert hasattr(eveonline, "EveOnlineNotFoundError")
+        assert eveonline.EveOnlineNotFoundError is EveOnlineNotFoundError

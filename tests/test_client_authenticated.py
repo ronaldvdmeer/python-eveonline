@@ -10,7 +10,7 @@ from aioresponses import aioresponses
 
 from eveonline import EveOnlineClient
 from eveonline.const import ESI_BASE_URL
-from eveonline.exceptions import EveOnlineAuthenticationError
+from eveonline.exceptions import EveOnlineAuthenticationError, EveOnlineNotFoundError
 from eveonline.models import (
     CharacterLocation,
     CharacterOnlineStatus,
@@ -42,6 +42,21 @@ class TestAuthRequired:
                 match="Authentication required",
             ):
                 await client.async_get_character_online(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_online_not_found_raises(self):
+        """HTTP 404 on authenticated endpoint raises EveOnlineNotFoundError."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/online/?datasource=tranquility",
+                status=404,
+                body="Character not found",
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                with pytest.raises(EveOnlineNotFoundError):
+                    await client.async_get_character_online(CHARACTER_ID)
 
     @pytest.mark.asyncio
     async def test_wallet_without_auth_raises(self):

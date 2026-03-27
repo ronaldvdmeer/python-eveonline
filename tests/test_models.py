@@ -4,13 +4,20 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import pytest
+
 from eveonline.models import (
     CharacterLocation,
     CharacterOnlineStatus,
     CharacterPortrait,
     CharacterPublicInfo,
     CharacterShip,
+    CharacterSkillsSummary,
     CorporationPublicInfo,
+    IndustryJob,
+    JumpFatigue,
+    MailLabelsSummary,
+    MarketOrder,
     ServerStatus,
     SkillQueueEntry,
     UniverseName,
@@ -43,13 +50,13 @@ class TestServerStatusModel:
         assert status.vip is None
 
     def test_frozen(self):
-        """Dataclass is immutable."""
+        """Dataclass is immutable (frozen + slots)."""
         status = ServerStatus(
             players=100,
             server_version="1",
             start_time=datetime(2026, 1, 1, tzinfo=UTC),
         )
-        with __import__("pytest").raises(AttributeError):
+        with pytest.raises(AttributeError):
             status.players = 200  # type: ignore[misc]
 
 
@@ -244,3 +251,31 @@ class TestUniverseNameModel:
         assert name.id == 98000001
         assert name.name == "C C P"
         assert name.category == "corporation"
+
+
+class TestSlotsEnabled:
+    """Verify all models use __slots__ for memory efficiency."""
+
+    @pytest.mark.parametrize(
+        "cls",
+        [
+            ServerStatus,
+            CharacterPublicInfo,
+            CharacterPortrait,
+            CorporationPublicInfo,
+            CharacterOnlineStatus,
+            CharacterLocation,
+            CharacterShip,
+            WalletBalance,
+            SkillQueueEntry,
+            UniverseName,
+            CharacterSkillsSummary,
+            MailLabelsSummary,
+            IndustryJob,
+            MarketOrder,
+            JumpFatigue,
+        ],
+    )
+    def test_has_slots(self, cls):
+        """Dataclass has __slots__ defined."""
+        assert hasattr(cls, "__slots__")
