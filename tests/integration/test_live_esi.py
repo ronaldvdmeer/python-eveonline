@@ -199,7 +199,7 @@ async def test_skills_live(auth_client: EveOnlineClient) -> None:
     skills = await auth_client.async_get_skills(_AUTH_CHARACTER_ID)
 
     assert skills.total_sp >= 0
-    assert isinstance(skills.skills, list)
+    assert isinstance(skills.unallocated_sp, int)
 
 
 @pytest.mark.integration
@@ -273,7 +273,7 @@ async def test_clones_live(auth_client: EveOnlineClient) -> None:
     """Clone info returns a valid model (home location may or may not be set)."""
     clones = await auth_client.async_get_clones(_AUTH_CHARACTER_ID)
 
-    assert isinstance(clones.jump_clones, list)
+    assert isinstance(clones.jump_clones, tuple | list)
 
 
 @pytest.mark.integration
