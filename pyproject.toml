@@ -58,6 +58,10 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-fail-under=90",
     "-v",
+    "-m", "not integration",
+]
+markers = [
+    "integration: live ESI API tests — require network access; authenticated tests also require ESI_TOKEN env var",
 ]
 
 # -- coverage ----------------------------------------------------------------
