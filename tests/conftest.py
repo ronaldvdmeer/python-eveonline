@@ -265,3 +265,144 @@ def jump_fatigue_data():
         "last_jump_date": "2026-03-26T12:00:00Z",
         "last_update_date": "2026-03-26T12:00:00Z",
     }
+
+
+@pytest.fixture
+def notifications_data():
+    """Mock response for GET /characters/{character_id}/notifications/."""
+    return [
+        {
+            "notification_id": 1234567890,
+            "sender_id": 98000001,
+            "sender_type": "corporation",
+            "type": "StructureUnderAttack",
+            "timestamp": "2026-03-27T10:00:00Z",
+            "is_read": False,
+            "text": "structureID: 1035466617946\n",
+        },
+        {
+            "notification_id": 1234567891,
+            "sender_id": 2113024536,
+            "sender_type": "character",
+            "type": "CorpAllBillMsg",
+            "timestamp": "2026-03-26T08:00:00Z",
+            "is_read": True,
+        },
+    ]
+
+
+@pytest.fixture
+def clones_data():
+    """Mock response for GET /characters/{character_id}/clones/."""
+    return {
+        "home_location": {
+            "location_id": 60003760,
+            "location_type": "station",
+        },
+        "jump_clones": [
+            {
+                "jump_clone_id": 12345,
+                "location_id": 60003760,
+                "location_type": "station",
+                "implants": [9899, 9941, 9942],
+                "name": "Jita Clone",
+            },
+            {
+                "jump_clone_id": 12346,
+                "location_id": 1035466617946,
+                "location_type": "structure",
+                "implants": [],
+            },
+        ],
+        "last_clone_jump_date": "2026-03-25T10:00:00Z",
+        "last_station_change_date": "2026-03-20T08:00:00Z",
+    }
+
+
+@pytest.fixture
+def implants_data():
+    """Mock response for GET /characters/{character_id}/implants/."""
+    return [9899, 9941, 9942, 9943, 9956]
+
+
+@pytest.fixture
+def wallet_journal_data():
+    """Mock response for GET /characters/{character_id}/wallet/journal/."""
+    return [
+        {
+            "id": 98765001,
+            "date": "2026-03-27T12:00:00Z",
+            "ref_type": "market_escrow",
+            "description": "Market escrow authorized",
+            "amount": -1500000.0,
+            "balance": 1233067890.12,
+            "first_party_id": 2113024536,
+            "second_party_id": 98000001,
+        },
+        {
+            "id": 98765002,
+            "date": "2026-03-27T08:00:00Z",
+            "ref_type": "bounty_prizes",
+            "description": "Bounty Prizes",
+            "amount": 2500000.0,
+            "balance": 1234567890.12,
+            "first_party_id": 2113024536,
+            "reason": "NPC bounties",
+        },
+    ]
+
+
+@pytest.fixture
+def contacts_data():
+    """Mock response for GET /characters/{character_id}/contacts/."""
+    return [
+        {
+            "contact_id": 2113024536,
+            "contact_type": "character",
+            "standing": 10.0,
+            "is_blocked": False,
+            "is_watched": True,
+            "label_ids": [1, 3],
+        },
+        {
+            "contact_id": 98000001,
+            "contact_type": "corporation",
+            "standing": 5.0,
+        },
+    ]
+
+
+@pytest.fixture
+def calendar_data():
+    """Mock response for GET /characters/{character_id}/calendar/."""
+    return [
+        {
+            "event_id": 1386435,
+            "event_date": "2026-04-01T19:00:00Z",
+            "title": "Corp Mining Op",
+            "importance": 0,
+            "event_response": "accepted",
+        },
+        {
+            "event_id": 1386436,
+            "event_date": "2026-04-05T21:00:00Z",
+            "title": "Alliance Fleet",
+            "importance": 1,
+            "event_response": "not_responded",
+        },
+    ]
+
+
+@pytest.fixture
+def loyalty_points_data():
+    """Mock response for GET /characters/{character_id}/loyalty/points/."""
+    return [
+        {
+            "corporation_id": 1000125,
+            "loyalty_points": 14163,
+        },
+        {
+            "corporation_id": 1000180,
+            "loyalty_points": 450,
+        },
+    ]

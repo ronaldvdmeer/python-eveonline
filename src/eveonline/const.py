@@ -28,6 +28,9 @@ SCOPE_READ_FATIGUE: Final = "esi-characters.read_fatigue.v1"
 SCOPE_READ_MAIL: Final = "esi-mail.read_mail.v1"
 SCOPE_READ_INDUSTRY_JOBS: Final = "esi-industry.read_character_jobs.v1"
 SCOPE_READ_MARKET_ORDERS: Final = "esi-markets.read_character_orders.v1"
+SCOPE_READ_CONTACTS: Final = "esi-characters.read_contacts.v1"
+SCOPE_READ_CALENDAR: Final = "esi-calendar.read_calendar_events.v1"
+SCOPE_READ_LOYALTY: Final = "esi-characters.read_loyalty.v1"
 
 # Default scopes for a typical Home Assistant integration
 DEFAULT_SCOPES: Final = (

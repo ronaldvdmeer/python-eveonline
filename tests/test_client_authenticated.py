@@ -12,16 +12,24 @@ from eveonline import EveOnlineClient
 from eveonline.const import ESI_BASE_URL
 from eveonline.exceptions import EveOnlineAuthenticationError, EveOnlineNotFoundError
 from eveonline.models import (
+    CalendarEvent,
+    CharacterClones,
+    CharacterContact,
     CharacterLocation,
+    CharacterNotification,
     CharacterOnlineStatus,
     CharacterShip,
     CharacterSkillsSummary,
+    CloneHomeLocation,
     IndustryJob,
+    JumpClone,
     JumpFatigue,
+    LoyaltyPoints,
     MailLabelsSummary,
     MarketOrder,
     SkillQueueEntry,
     WalletBalance,
+    WalletJournalEntry,
 )
 
 from .conftest import MockAuth
@@ -129,6 +137,62 @@ class TestAuthRequired:
             client = EveOnlineClient(session=session)
             with pytest.raises(EveOnlineAuthenticationError):
                 await client.async_get_jump_fatigue(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_notifications_without_auth_raises(self):
+        """Calling notifications endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_notifications(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_clones_without_auth_raises(self):
+        """Calling clones endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_clones(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_implants_without_auth_raises(self):
+        """Calling implants endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_implants(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_wallet_journal_without_auth_raises(self):
+        """Calling wallet journal endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_wallet_journal(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_contacts_without_auth_raises(self):
+        """Calling contacts endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_contacts(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_calendar_without_auth_raises(self):
+        """Calling calendar endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_calendar(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_loyalty_points_without_auth_raises(self):
+        """Calling loyalty points endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_loyalty_points(CHARACTER_ID)
 
 
 class TestCharacterOnline:
@@ -622,3 +686,345 @@ class TestJumpFatigue:
         assert fatigue.jump_fatigue_expire_date is None
         assert fatigue.last_jump_date is None
         assert fatigue.last_update_date is None
+
+
+class TestNotifications:
+    """Test GET /characters/{character_id}/notifications/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_notifications_success(self, notifications_data):
+        """Successful notifications fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/notifications/?datasource=tranquility",
+                payload=notifications_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                notifications = await client.async_get_notifications(CHARACTER_ID)
+
+        assert len(notifications) == 2
+        assert all(isinstance(n, CharacterNotification) for n in notifications)
+
+        first = notifications[0]
+        assert first.notification_id == 1234567890
+        assert first.sender_id == 98000001
+        assert first.sender_type == "corporation"
+        assert first.type == "StructureUnderAttack"
+        assert first.timestamp == datetime(2026, 3, 27, 10, 0, tzinfo=UTC)
+        assert first.is_read is False
+        assert first.text == "structureID: 1035466617946\n"
+
+        second = notifications[1]
+        assert second.is_read is True
+        assert second.text is None
+
+    @pytest.mark.asyncio
+    async def test_get_notifications_empty(self):
+        """No notifications returns empty list."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/notifications/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                notifications = await client.async_get_notifications(CHARACTER_ID)
+
+        assert notifications == []
+
+
+class TestClones:
+    """Test GET /characters/{character_id}/clones/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_clones_success(self, clones_data):
+        """Successful clones fetch with home location and jump clones."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/clones/?datasource=tranquility",
+                payload=clones_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                clones = await client.async_get_clones(CHARACTER_ID)
+
+        assert isinstance(clones, CharacterClones)
+        assert isinstance(clones.home_location, CloneHomeLocation)
+        assert clones.home_location.location_id == 60003760
+        assert clones.home_location.location_type == "station"
+
+        assert len(clones.jump_clones) == 2
+        assert all(isinstance(jc, JumpClone) for jc in clones.jump_clones)
+
+        first = clones.jump_clones[0]
+        assert first.jump_clone_id == 12345
+        assert first.implants == (9899, 9941, 9942)
+        assert first.name == "Jita Clone"
+
+        second = clones.jump_clones[1]
+        assert second.implants == ()
+        assert second.name is None
+
+        assert clones.last_clone_jump_date == datetime(2026, 3, 25, 10, 0, tzinfo=UTC)
+        assert clones.last_station_change_date == datetime(2026, 3, 20, 8, 0, tzinfo=UTC)
+
+    @pytest.mark.asyncio
+    async def test_get_clones_no_jump_clones(self):
+        """Character with no jump clones."""
+        data = {
+            "home_location": {"location_id": 60003760, "location_type": "station"},
+            "jump_clones": [],
+        }
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/clones/?datasource=tranquility",
+                payload=data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                clones = await client.async_get_clones(CHARACTER_ID)
+
+        assert clones.jump_clones == ()
+        assert clones.home_location is not None
+
+    @pytest.mark.asyncio
+    async def test_get_clones_no_home_location(self):
+        """Character with no home location set."""
+        data = {"jump_clones": []}
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/clones/?datasource=tranquility",
+                payload=data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                clones = await client.async_get_clones(CHARACTER_ID)
+
+        assert clones.home_location is None
+
+
+class TestImplants:
+    """Test GET /characters/{character_id}/implants/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_implants_success(self, implants_data):
+        """Successful implants fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/implants/?datasource=tranquility",
+                payload=implants_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                implants = await client.async_get_implants(CHARACTER_ID)
+
+        assert implants == (9899, 9941, 9942, 9943, 9956)
+
+    @pytest.mark.asyncio
+    async def test_get_implants_empty(self):
+        """Character with no implants."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/implants/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                implants = await client.async_get_implants(CHARACTER_ID)
+
+        assert implants == ()
+
+
+class TestWalletJournal:
+    """Test GET /characters/{character_id}/wallet/journal/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_wallet_journal_success(self, wallet_journal_data):
+        """Successful wallet journal fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/wallet/journal/?datasource=tranquility",
+                payload=wallet_journal_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                journal = await client.async_get_wallet_journal(CHARACTER_ID)
+
+        assert len(journal) == 2
+        assert all(isinstance(e, WalletJournalEntry) for e in journal)
+
+        first = journal[0]
+        assert first.id == 98765001
+        assert first.ref_type == "market_escrow"
+        assert first.amount == -1500000.0
+        assert first.balance == 1233067890.12
+        assert first.date == datetime(2026, 3, 27, 12, 0, tzinfo=UTC)
+        assert first.first_party_id == 2113024536
+        assert first.second_party_id == 98000001
+        assert first.reason is None
+
+        second = journal[1]
+        assert second.reason == "NPC bounties"
+        assert second.second_party_id is None
+
+    @pytest.mark.asyncio
+    async def test_get_wallet_journal_empty(self):
+        """No journal entries returns empty list."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/wallet/journal/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                journal = await client.async_get_wallet_journal(CHARACTER_ID)
+
+        assert journal == []
+
+
+class TestContacts:
+    """Test GET /characters/{character_id}/contacts/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_contacts_success(self, contacts_data):
+        """Successful contacts fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/contacts/?datasource=tranquility",
+                payload=contacts_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                contacts = await client.async_get_contacts(CHARACTER_ID)
+
+        assert len(contacts) == 2
+        assert all(isinstance(c, CharacterContact) for c in contacts)
+
+        first = contacts[0]
+        assert first.contact_id == 2113024536
+        assert first.contact_type == "character"
+        assert first.standing == 10.0
+        assert first.is_blocked is False
+        assert first.is_watched is True
+        assert first.label_ids == (1, 3)
+
+        second = contacts[1]
+        assert second.contact_type == "corporation"
+        assert second.standing == 5.0
+        assert second.is_blocked is None
+        assert second.label_ids is None
+
+    @pytest.mark.asyncio
+    async def test_get_contacts_empty(self):
+        """No contacts returns empty list."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/contacts/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                contacts = await client.async_get_contacts(CHARACTER_ID)
+
+        assert contacts == []
+
+
+class TestCalendar:
+    """Test GET /characters/{character_id}/calendar/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_calendar_success(self, calendar_data):
+        """Successful calendar events fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/calendar/?datasource=tranquility",
+                payload=calendar_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                events = await client.async_get_calendar(CHARACTER_ID)
+
+        assert len(events) == 2
+        assert all(isinstance(e, CalendarEvent) for e in events)
+
+        first = events[0]
+        assert first.event_id == 1386435
+        assert first.title == "Corp Mining Op"
+        assert first.event_date == datetime(2026, 4, 1, 19, 0, tzinfo=UTC)
+        assert first.importance == 0
+        assert first.event_response == "accepted"
+
+        second = events[1]
+        assert second.importance == 1
+        assert second.event_response == "not_responded"
+
+    @pytest.mark.asyncio
+    async def test_get_calendar_empty(self):
+        """No upcoming events returns empty list."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/calendar/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                events = await client.async_get_calendar(CHARACTER_ID)
+
+        assert events == []
+
+
+class TestLoyaltyPoints:
+    """Test GET /characters/{character_id}/loyalty/points/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_loyalty_points_success(self, loyalty_points_data):
+        """Successful loyalty points fetch."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/loyalty/points/?datasource=tranquility",
+                payload=loyalty_points_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                lp = await client.async_get_loyalty_points(CHARACTER_ID)
+
+        assert len(lp) == 2
+        assert all(isinstance(entry, LoyaltyPoints) for entry in lp)
+
+        first = lp[0]
+        assert first.corporation_id == 1000125
+        assert first.loyalty_points == 14163
+
+        second = lp[1]
+        assert second.corporation_id == 1000180
+        assert second.loyalty_points == 450
+
+    @pytest.mark.asyncio
+    async def test_get_loyalty_points_empty(self):
+        """No loyalty points returns empty list."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/loyalty/points/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                lp = await client.async_get_loyalty_points(CHARACTER_ID)
+
+        assert lp == []

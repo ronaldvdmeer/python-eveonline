@@ -17,21 +17,29 @@ from .exceptions import (
     EveOnlineRateLimitError,
 )
 from .models import (
+    CalendarEvent,
+    CharacterClones,
+    CharacterContact,
     CharacterLocation,
+    CharacterNotification,
     CharacterOnlineStatus,
     CharacterPortrait,
     CharacterPublicInfo,
     CharacterShip,
     CharacterSkillsSummary,
+    CloneHomeLocation,
     CorporationPublicInfo,
     IndustryJob,
+    JumpClone,
     JumpFatigue,
+    LoyaltyPoints,
     MailLabelsSummary,
     MarketOrder,
     ServerStatus,
     SkillQueueEntry,
     UniverseName,
     WalletBalance,
+    WalletJournalEntry,
 )
 
 
@@ -497,3 +505,175 @@ class EveOnlineClient:
             last_jump_date=self._parse_datetime(data.get("last_jump_date")),
             last_update_date=self._parse_datetime(data.get("last_update_date")),
         )
+
+    async def async_get_notifications(self, character_id: int) -> list[CharacterNotification]:
+        """Get a character's recent notifications.
+
+        Requires scope: ``esi-characters.read_notifications.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            List of CharacterNotification entries, newest first.
+        """
+        data = await self._request("GET", f"characters/{character_id}/notifications/", authenticated=True)
+        return [
+            CharacterNotification(
+                notification_id=entry["notification_id"],
+                sender_id=entry["sender_id"],
+                sender_type=entry["sender_type"],
+                type=entry["type"],
+                timestamp=datetime.fromisoformat(entry["timestamp"]),
+                is_read=entry.get("is_read"),
+                text=entry.get("text"),
+            )
+            for entry in data
+        ]
+
+    async def async_get_clones(self, character_id: int) -> CharacterClones:
+        """Get a character's clone information.
+
+        Requires scope: ``esi-clones.read_clones.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            CharacterClones with home location and jump clones.
+        """
+        data = await self._request("GET", f"characters/{character_id}/clones/", authenticated=True)
+
+        home_loc = data.get("home_location")
+        home_location: CloneHomeLocation | None = None
+        if home_loc:
+            home_location = CloneHomeLocation(
+                location_id=home_loc["location_id"],
+                location_type=home_loc["location_type"],
+            )
+
+        jump_clones = tuple(
+            JumpClone(
+                jump_clone_id=jc["jump_clone_id"],
+                location_id=jc["location_id"],
+                location_type=jc["location_type"],
+                implants=tuple(jc.get("implants", [])),
+                name=jc.get("name"),
+            )
+            for jc in data.get("jump_clones", [])
+        )
+
+        return CharacterClones(
+            home_location=home_location,
+            jump_clones=jump_clones,
+            last_clone_jump_date=self._parse_datetime(data.get("last_clone_jump_date")),
+            last_station_change_date=self._parse_datetime(data.get("last_station_change_date")),
+        )
+
+    async def async_get_implants(self, character_id: int) -> tuple[int, ...]:
+        """Get the type IDs of a character's active implants.
+
+        Requires scope: ``esi-clones.read_implants.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            Tuple of implant type IDs.
+        """
+        data = await self._request("GET", f"characters/{character_id}/implants/", authenticated=True)
+        return tuple(data)
+
+    async def async_get_wallet_journal(self, character_id: int) -> list[WalletJournalEntry]:
+        """Get a character's wallet journal (recent transactions).
+
+        Requires scope: ``esi-wallet.read_character_wallet.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            List of WalletJournalEntry entries, newest first.
+        """
+        data = await self._request("GET", f"characters/{character_id}/wallet/journal/", authenticated=True)
+        return [
+            WalletJournalEntry(
+                id=entry["id"],
+                date=datetime.fromisoformat(entry["date"]),
+                ref_type=entry["ref_type"],
+                description=entry.get("description", ""),
+                amount=entry.get("amount"),
+                balance=entry.get("balance"),
+                first_party_id=entry.get("first_party_id"),
+                second_party_id=entry.get("second_party_id"),
+                reason=entry.get("reason"),
+            )
+            for entry in data
+        ]
+
+    async def async_get_contacts(self, character_id: int) -> list[CharacterContact]:
+        """Get a character's contacts.
+
+        Requires scope: ``esi-characters.read_contacts.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            List of CharacterContact entries.
+        """
+        data = await self._request("GET", f"characters/{character_id}/contacts/", authenticated=True)
+        return [
+            CharacterContact(
+                contact_id=entry["contact_id"],
+                contact_type=entry["contact_type"],
+                standing=entry["standing"],
+                is_blocked=entry.get("is_blocked"),
+                is_watched=entry.get("is_watched"),
+                label_ids=tuple(entry["label_ids"]) if entry.get("label_ids") else None,
+            )
+            for entry in data
+        ]
+
+    async def async_get_calendar(self, character_id: int) -> list[CalendarEvent]:
+        """Get a character's upcoming calendar events.
+
+        Requires scope: ``esi-calendar.read_calendar_events.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            List of CalendarEvent entries.
+        """
+        data = await self._request("GET", f"characters/{character_id}/calendar/", authenticated=True)
+        return [
+            CalendarEvent(
+                event_id=entry["event_id"],
+                event_date=datetime.fromisoformat(entry["event_date"]),
+                title=entry["title"],
+                importance=entry.get("importance"),
+                event_response=entry.get("event_response"),
+            )
+            for entry in data
+        ]
+
+    async def async_get_loyalty_points(self, character_id: int) -> list[LoyaltyPoints]:
+        """Get a character's loyalty points per corporation.
+
+        Requires scope: ``esi-characters.read_loyalty.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            List of LoyaltyPoints entries.
+        """
+        data = await self._request("GET", f"characters/{character_id}/loyalty/points/", authenticated=True)
+        return [
+            LoyaltyPoints(
+                corporation_id=entry["corporation_id"],
+                loyalty_points=entry["loyalty_points"],
+            )
+            for entry in data
+        ]

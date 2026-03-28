@@ -303,3 +303,155 @@ class JumpFatigue:
     jump_fatigue_expire_date: datetime | None = None
     last_jump_date: datetime | None = None
     last_update_date: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterNotification:
+    """A character notification (requires auth).
+
+    Attributes:
+        notification_id: Unique notification identifier.
+        sender_id: ID of the entity that sent the notification.
+        sender_type: Sender category (``"character"``, ``"corporation"``, etc.).
+        type: Notification type string (e.g. ``"StructureUnderAttack"``).
+        timestamp: When the notification was sent.
+        is_read: Whether the notification has been read.
+        text: Notification body text (YAML-encoded by EVE).
+    """
+
+    notification_id: int
+    sender_id: int
+    sender_type: str
+    type: str
+    timestamp: datetime
+    is_read: bool | None = None
+    text: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class JumpClone:
+    """A single jump clone (part of CharacterClones).
+
+    Attributes:
+        jump_clone_id: Unique jump clone identifier.
+        location_id: Station or structure ID where the clone is stored.
+        location_type: ``"station"`` or ``"structure"``.
+        implants: Type IDs of implants installed in this clone.
+        name: Player-assigned name, if any.
+    """
+
+    jump_clone_id: int
+    location_id: int
+    location_type: str
+    implants: tuple[int, ...]
+    name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CloneHomeLocation:
+    """Home station / structure for clone bay (part of CharacterClones).
+
+    Attributes:
+        location_id: Station or structure ID.
+        location_type: ``"station"`` or ``"structure"``.
+    """
+
+    location_id: int
+    location_type: str
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterClones:
+    """Character clone information (requires auth).
+
+    Attributes:
+        home_location: Home station/structure for medical clone.
+        jump_clones: List of jump clones.
+        last_clone_jump_date: When the character last jumped clones.
+        last_station_change_date: When the home station was last changed.
+    """
+
+    home_location: CloneHomeLocation | None
+    jump_clones: tuple[JumpClone, ...]
+    last_clone_jump_date: datetime | None = None
+    last_station_change_date: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class WalletJournalEntry:
+    """A single wallet journal entry (requires auth).
+
+    Attributes:
+        id: Unique journal entry identifier.
+        date: When the transaction occurred.
+        ref_type: Reference type (e.g. ``"market_escrow"``, ``"bounty_prizes"``).
+        description: Human-readable description.
+        amount: ISK amount (positive = income, negative = expense).
+        balance: ISK balance after this entry.
+        first_party_id: ID of the first party involved.
+        second_party_id: ID of the second party involved.
+        reason: Additional reason text, if any.
+    """
+
+    id: int
+    date: datetime
+    ref_type: str
+    description: str
+    amount: float | None = None
+    balance: float | None = None
+    first_party_id: int | None = None
+    second_party_id: int | None = None
+    reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterContact:
+    """A character contact entry (requires auth).
+
+    Attributes:
+        contact_id: ID of the contact (character, corp, alliance, or faction).
+        contact_type: ``"character"``, ``"corporation"``, ``"alliance"``, or ``"faction"``.
+        standing: Contact standing (-10.0 to +10.0).
+        is_blocked: Whether the contact is blocked.
+        is_watched: Whether the contact is on the watch list.
+        label_ids: IDs of labels assigned to this contact.
+    """
+
+    contact_id: int
+    contact_type: str
+    standing: float
+    is_blocked: bool | None = None
+    is_watched: bool | None = None
+    label_ids: tuple[int, ...] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarEvent:
+    """An upcoming calendar event (requires auth).
+
+    Attributes:
+        event_id: Unique event identifier.
+        event_date: When the event takes place.
+        title: Event title.
+        importance: 0 = normal, 1 = important.
+        event_response: ``"not_responded"``, ``"accepted"``, ``"declined"``, or ``"tentative"``.
+    """
+
+    event_id: int
+    event_date: datetime
+    title: str
+    importance: int | None = None
+    event_response: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LoyaltyPoints:
+    """Loyalty points for a single corporation (requires auth).
+
+    Attributes:
+        corporation_id: The corporation ID.
+        loyalty_points: Number of LP accumulated.
+    """
+
+    corporation_id: int
+    loyalty_points: int

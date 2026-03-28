@@ -331,3 +331,155 @@ if fatigue.jump_fatigue_expire_date:
 | `jump_fatigue_expire_date` | `datetime \| None` | When fatigue expires |
 | `last_jump_date` | `datetime \| None` | Last jump timestamp |
 | `last_update_date` | `datetime \| None` | Data update timestamp |
+
+---
+
+### `async_get_notifications(character_id)`
+
+Scope: `esi-characters.read_notifications.v1`
+
+```python
+notifications = await client.async_get_notifications(character_id)
+unread = [n for n in notifications if not n.is_read]
+print(f"{len(unread)} unread notifications")
+```
+
+**Returns:** `list[CharacterNotification]`
+
+| Field | Type | Description |
+|---|---|---|
+| `notification_id` | `int` | Notification ID |
+| `sender_id` | `int` | Sender entity ID |
+| `sender_type` | `str` | `"character"`, `"corporation"`, etc. |
+| `type` | `str` | Notification type (e.g. `"StructureUnderAttack"`) |
+| `timestamp` | `datetime` | When the notification was sent |
+| `is_read` | `bool \| None` | Whether it has been read |
+| `text` | `str \| None` | YAML-encoded notification body |
+
+---
+
+### `async_get_clones(character_id)`
+
+Scope: `esi-clones.read_clones.v1`
+
+```python
+clones = await client.async_get_clones(character_id)
+print(f"Home: {clones.home_location.location_id}")
+print(f"{len(clones.jump_clones)} jump clones")
+```
+
+**Returns:** `CharacterClones`
+
+| Field | Type | Description |
+|---|---|---|
+| `home_location` | `CloneHomeLocation \| None` | Medical clone station/structure |
+| `jump_clones` | `tuple[JumpClone, ...]` | List of jump clones |
+| `last_clone_jump_date` | `datetime \| None` | Last clone jump |
+| `last_station_change_date` | `datetime \| None` | Last home station change |
+
+`CloneHomeLocation` fields: `location_id` (int), `location_type` (str).
+
+`JumpClone` fields: `jump_clone_id` (int), `location_id` (int), `location_type` (str), `implants` (tuple[int, ...]), `name` (str | None).
+
+---
+
+### `async_get_implants(character_id)`
+
+Scope: `esi-clones.read_implants.v1`
+
+```python
+implants = await client.async_get_implants(character_id)
+print(f"{len(implants)} active implants: {implants}")
+```
+
+**Returns:** `tuple[int, ...]` — type IDs of active implants.
+
+---
+
+### `async_get_wallet_journal(character_id)`
+
+Scope: `esi-wallet.read_character_wallet.v1`
+
+```python
+journal = await client.async_get_wallet_journal(character_id)
+for entry in journal[:5]:
+    print(f"{entry.date}: {entry.ref_type} {entry.amount:+,.2f} ISK")
+```
+
+**Returns:** `list[WalletJournalEntry]`
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | `int` | Journal entry ID |
+| `date` | `datetime` | Transaction time |
+| `ref_type` | `str` | Transaction type (e.g. `"bounty_prizes"`) |
+| `description` | `str` | Human-readable description |
+| `amount` | `float \| None` | ISK amount (+income / −expense) |
+| `balance` | `float \| None` | Balance after transaction |
+| `first_party_id` | `int \| None` | First party ID |
+| `second_party_id` | `int \| None` | Second party ID |
+| `reason` | `str \| None` | Additional reason text |
+
+---
+
+### `async_get_contacts(character_id)`
+
+Scope: `esi-characters.read_contacts.v1`
+
+```python
+contacts = await client.async_get_contacts(character_id)
+friends = [c for c in contacts if c.standing > 0]
+print(f"{len(friends)} friendly contacts")
+```
+
+**Returns:** `list[CharacterContact]`
+
+| Field | Type | Description |
+|---|---|---|
+| `contact_id` | `int` | Contact entity ID |
+| `contact_type` | `str` | `"character"`, `"corporation"`, `"alliance"`, `"faction"` |
+| `standing` | `float` | Standing (-10.0 to +10.0) |
+| `is_blocked` | `bool \| None` | Whether blocked |
+| `is_watched` | `bool \| None` | Whether on watch list |
+| `label_ids` | `tuple[int, ...] \| None` | Assigned label IDs |
+
+---
+
+### `async_get_calendar(character_id)`
+
+Scope: `esi-calendar.read_calendar_events.v1`
+
+```python
+events = await client.async_get_calendar(character_id)
+for event in events:
+    print(f"{event.event_date}: {event.title}")
+```
+
+**Returns:** `list[CalendarEvent]`
+
+| Field | Type | Description |
+|---|---|---|
+| `event_id` | `int` | Event ID |
+| `event_date` | `datetime` | Event start time |
+| `title` | `str` | Event title |
+| `importance` | `int \| None` | 0 = normal, 1 = important |
+| `event_response` | `str \| None` | `"accepted"`, `"declined"`, `"tentative"`, `"not_responded"` |
+
+---
+
+### `async_get_loyalty_points(character_id)`
+
+Scope: `esi-characters.read_loyalty.v1`
+
+```python
+lp = await client.async_get_loyalty_points(character_id)
+for entry in lp:
+    print(f"Corp {entry.corporation_id}: {entry.loyalty_points:,} LP")
+```
+
+**Returns:** `list[LoyaltyPoints]`
+
+| Field | Type | Description |
+|---|---|---|
+| `corporation_id` | `int` | Corporation ID |
+| `loyalty_points` | `int` | LP accumulated |
