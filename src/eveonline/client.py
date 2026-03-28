@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, overload
 
 from aiohttp import ClientSession
 
@@ -169,6 +169,18 @@ class EveOnlineClient:
         return await response.json()
 
     @staticmethod
+    @overload
+    def _parse_datetime(value: str) -> datetime: ...
+
+    @staticmethod
+    @overload
+    def _parse_datetime(value: None) -> None: ...
+
+    @staticmethod
+    @overload
+    def _parse_datetime(value: str | None) -> datetime | None: ...
+
+    @staticmethod
     def _parse_datetime(value: str | None) -> datetime | None:
         """Parse an ISO 8601 datetime string from ESI.
 
@@ -177,8 +189,8 @@ class EveOnlineClient:
                 ``None``.
 
         Returns:
-            A timezone-aware :class:`~datetime.datetime`, or ``None`` when
-            *value* is ``None``.
+            A :class:`~datetime.datetime` when *value* is a string, or
+            ``None`` when *value* is ``None``.
         """
         if value is None:
             return None
@@ -198,7 +210,7 @@ class EveOnlineClient:
         return ServerStatus(
             players=data["players"],
             server_version=data["server_version"],
-            start_time=datetime.fromisoformat(data["start_time"]),
+            start_time=self._parse_datetime(data["start_time"]),
             vip=data.get("vip"),
         )
 
@@ -216,7 +228,7 @@ class EveOnlineClient:
             character_id=character_id,
             name=data["name"],
             corporation_id=data["corporation_id"],
-            birthday=datetime.fromisoformat(data["birthday"]),
+            birthday=self._parse_datetime(data["birthday"]),
             gender=data["gender"],
             race_id=data["race_id"],
             bloodline_id=data["bloodline_id"],
@@ -446,8 +458,8 @@ class EveOnlineClient:
                 job_id=entry["job_id"],
                 activity_id=entry["activity_id"],
                 status=entry["status"],
-                start_date=datetime.fromisoformat(entry["start_date"]),
-                end_date=datetime.fromisoformat(entry["end_date"]),
+                start_date=self._parse_datetime(entry["start_date"]),
+                end_date=self._parse_datetime(entry["end_date"]),
                 blueprint_type_id=entry["blueprint_type_id"],
                 output_location_id=entry["output_location_id"],
                 runs=entry["runs"],
@@ -480,7 +492,7 @@ class EveOnlineClient:
                 volume_total=entry["volume_total"],
                 location_id=entry["location_id"],
                 region_id=entry["region_id"],
-                issued=datetime.fromisoformat(entry["issued"]),
+                issued=self._parse_datetime(entry["issued"]),
                 duration=entry["duration"],
                 range=entry["range"],
                 min_volume=entry.get("min_volume"),
@@ -524,7 +536,7 @@ class EveOnlineClient:
                 sender_id=entry["sender_id"],
                 sender_type=entry["sender_type"],
                 type=entry["type"],
-                timestamp=datetime.fromisoformat(entry["timestamp"]),
+                timestamp=self._parse_datetime(entry["timestamp"]),
                 is_read=entry.get("is_read"),
                 text=entry.get("text"),
             )
@@ -599,7 +611,7 @@ class EveOnlineClient:
         return [
             WalletJournalEntry(
                 id=entry["id"],
-                date=datetime.fromisoformat(entry["date"]),
+                date=self._parse_datetime(entry["date"]),
                 ref_type=entry["ref_type"],
                 description=entry.get("description", ""),
                 amount=entry.get("amount"),
@@ -650,7 +662,7 @@ class EveOnlineClient:
         return [
             CalendarEvent(
                 event_id=entry["event_id"],
-                event_date=datetime.fromisoformat(entry["event_date"]),
+                event_date=self._parse_datetime(entry["event_date"]),
                 title=entry["title"],
                 importance=entry.get("importance"),
                 event_response=entry.get("event_response"),
