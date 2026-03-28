@@ -20,6 +20,8 @@ ESI_TOKEN
 
 from __future__ import annotations
 
+import base64
+import json
 import os
 
 import aiohttp
@@ -41,6 +43,23 @@ _CHARACTER_ID: int = int(_CHARACTER_ID_STR) if _CHARACTER_ID_STR else _DEFAULT_C
 NEEDS_TOKEN = pytest.mark.skipif(not _ESI_TOKEN, reason="ESI_TOKEN env var not set")
 
 
+def _character_id_from_token(token: str) -> int:
+    """Extract character ID from an ESI JWT without verifying the signature.
+
+    The JWT ``sub`` claim looks like ``CHARACTER:EVE:12345678``.
+    Falls back to ``_CHARACTER_ID`` if decoding fails.
+    """
+    try:
+        payload_b64 = token.split(".")[1]
+        # JWT base64 is unpadded — add padding as needed
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload = json.loads(base64.b64decode(payload_b64))
+        sub: str = payload.get("sub", "")
+        return int(sub.split(":")[-1])
+    except Exception:
+        return _CHARACTER_ID
+
+
 # ---------------------------------------------------------------------------
 # Concrete auth implementation for integration tests
 # ---------------------------------------------------------------------------
@@ -55,6 +74,11 @@ class _StaticTokenAuth(AbstractAuth):
 
     async def async_get_access_token(self) -> str:
         return self._token
+
+
+# Character ID for authenticated tests: derived from the JWT when available,
+# otherwise falls back to the explicit env var or the default character.
+_AUTH_CHARACTER_ID: int = _character_id_from_token(_ESI_TOKEN) if _ESI_TOKEN else _CHARACTER_ID
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +159,7 @@ async def test_character_public_info_live(public_client: EveOnlineClient) -> Non
 @pytest.mark.integration
 async def test_character_portrait_live(public_client: EveOnlineClient) -> None:
     """Character portrait returns at least one valid image URL."""
-    portrait = await public_client.async_get_portrait(_CHARACTER_ID)
+    portrait = await public_client.async_get_character_portrait(_CHARACTER_ID)
 
     urls = [portrait.px64x64, portrait.px128x128, portrait.px256x256, portrait.px512x512]
     assert any(urls), "At least one portrait URL must be set"
@@ -153,19 +177,16 @@ async def test_character_portrait_live(public_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_online_status_live(auth_client: EveOnlineClient) -> None:
     """Online status endpoint responds with a valid model."""
-    status = await auth_client.async_get_online_status()
+    status = await auth_client.async_get_character_online(_AUTH_CHARACTER_ID)
 
-    # is_online can be True or False depending on whether the char is logged in
-    assert isinstance(status.is_online, bool)
-    # last_login may be None for characters that have never previously logged in
-    # via the token owner, but the request itself must succeed
+    assert isinstance(status.online, bool)
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_wallet_balance_live(auth_client: EveOnlineClient) -> None:
     """Wallet balance returns a non-negative numeric value."""
-    wallet = await auth_client.async_get_wallet_balance()
+    wallet = await auth_client.async_get_wallet_balance(_AUTH_CHARACTER_ID)
 
     assert isinstance(wallet.balance, float | int)
     assert wallet.balance >= 0, "Wallet balance must be non-negative"
@@ -175,17 +196,17 @@ async def test_wallet_balance_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_skills_live(auth_client: EveOnlineClient) -> None:
     """Skills summary returns total_sp and a list of trained skills."""
-    skills = await auth_client.async_get_skills()
+    skills = await auth_client.async_get_skills(_AUTH_CHARACTER_ID)
 
     assert skills.total_sp >= 0
-    assert isinstance(skills.skills, list)
+    assert isinstance(skills.unallocated_sp, int)
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_skill_queue_live(auth_client: EveOnlineClient) -> None:
     """Skill queue returns a list (may be empty if nothing is training)."""
-    queue = await auth_client.async_get_skill_queue()
+    queue = await auth_client.async_get_skill_queue(_AUTH_CHARACTER_ID)
 
     assert isinstance(queue, list)
 
@@ -194,7 +215,7 @@ async def test_skill_queue_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_location_live(auth_client: EveOnlineClient) -> None:
     """Location returns a valid solar system ID (only works while online)."""
-    location = await auth_client.async_get_location()
+    location = await auth_client.async_get_character_location(_AUTH_CHARACTER_ID)
 
     assert location.solar_system_id > 0, "Solar system ID must be positive"
 
@@ -203,7 +224,7 @@ async def test_location_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_ship_live(auth_client: EveOnlineClient) -> None:
     """Current ship returns valid type and item IDs."""
-    ship = await auth_client.async_get_ship()
+    ship = await auth_client.async_get_character_ship(_AUTH_CHARACTER_ID)
 
     assert ship.ship_type_id > 0
     assert ship.ship_item_id > 0
@@ -214,16 +235,16 @@ async def test_ship_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_mail_labels_live(auth_client: EveOnlineClient) -> None:
     """Mail labels returns a list of label objects."""
-    labels = await auth_client.async_get_mail_labels()
+    labels = await auth_client.async_get_mail_labels(_AUTH_CHARACTER_ID)
 
-    assert isinstance(labels, list)
+    assert isinstance(labels.total_unread_count, int)
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_market_orders_live(auth_client: EveOnlineClient) -> None:
     """Market orders returns a list (may be empty)."""
-    orders = await auth_client.async_get_market_orders()
+    orders = await auth_client.async_get_market_orders(_AUTH_CHARACTER_ID)
 
     assert isinstance(orders, list)
 
@@ -232,7 +253,7 @@ async def test_market_orders_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_industry_jobs_live(auth_client: EveOnlineClient) -> None:
     """Industry jobs returns a list (may be empty)."""
-    jobs = await auth_client.async_get_industry_jobs()
+    jobs = await auth_client.async_get_industry_jobs(_AUTH_CHARACTER_ID)
 
     assert isinstance(jobs, list)
 
@@ -241,7 +262,7 @@ async def test_industry_jobs_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_notifications_live(auth_client: EveOnlineClient) -> None:
     """Notifications returns a list (may be empty)."""
-    notifications = await auth_client.async_get_notifications()
+    notifications = await auth_client.async_get_notifications(_AUTH_CHARACTER_ID)
 
     assert isinstance(notifications, list)
 
@@ -250,18 +271,18 @@ async def test_notifications_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_clones_live(auth_client: EveOnlineClient) -> None:
     """Clone info returns a valid model (home location may or may not be set)."""
-    clones = await auth_client.async_get_clones()
+    clones = await auth_client.async_get_clones(_AUTH_CHARACTER_ID)
 
-    assert isinstance(clones.jump_clones, list)
+    assert isinstance(clones.jump_clones, tuple | list)
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_implants_live(auth_client: EveOnlineClient) -> None:
-    """Implants returns a list of type IDs (may be empty)."""
-    implants = await auth_client.async_get_implants()
+    """Implants returns a tuple of type IDs (may be empty)."""
+    implants = await auth_client.async_get_implants(_AUTH_CHARACTER_ID)
 
-    assert isinstance(implants, list)
+    assert isinstance(implants, tuple)
     for implant_id in implants:
         assert implant_id > 0, f"Implant type ID must be positive, got {implant_id}"
 
@@ -270,7 +291,7 @@ async def test_implants_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_wallet_journal_live(auth_client: EveOnlineClient) -> None:
     """Wallet journal returns a list of entries (may be empty for new chars)."""
-    journal = await auth_client.async_get_wallet_journal()
+    journal = await auth_client.async_get_wallet_journal(_AUTH_CHARACTER_ID)
 
     assert isinstance(journal, list)
 
@@ -279,7 +300,7 @@ async def test_wallet_journal_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_contacts_live(auth_client: EveOnlineClient) -> None:
     """Contacts returns a list (may be empty)."""
-    contacts = await auth_client.async_get_contacts()
+    contacts = await auth_client.async_get_contacts(_AUTH_CHARACTER_ID)
 
     assert isinstance(contacts, list)
 
@@ -288,7 +309,7 @@ async def test_contacts_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_calendar_live(auth_client: EveOnlineClient) -> None:
     """Calendar events returns a list (may be empty)."""
-    events = await auth_client.async_get_calendar()
+    events = await auth_client.async_get_calendar(_AUTH_CHARACTER_ID)
 
     assert isinstance(events, list)
 
@@ -297,7 +318,7 @@ async def test_calendar_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_loyalty_points_live(auth_client: EveOnlineClient) -> None:
     """Loyalty points returns a list of LP entries (may be empty)."""
-    lp = await auth_client.async_get_loyalty_points()
+    lp = await auth_client.async_get_loyalty_points(_AUTH_CHARACTER_ID)
 
     assert isinstance(lp, list)
 
@@ -306,7 +327,7 @@ async def test_loyalty_points_live(auth_client: EveOnlineClient) -> None:
 @NEEDS_TOKEN
 async def test_jump_fatigue_live(auth_client: EveOnlineClient) -> None:
     """Jump fatigue returns a valid model (all fields may be None if no fatigue)."""
-    fatigue = await auth_client.async_get_jump_fatigue()
+    fatigue = await auth_client.async_get_jump_fatigue(_AUTH_CHARACTER_ID)
 
     # Fatigue fields are all optional — just check the call succeeds
     _ = fatigue

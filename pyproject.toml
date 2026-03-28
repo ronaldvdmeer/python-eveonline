@@ -164,6 +164,13 @@ ignore = [
 "src/eveonline/const.py" = [
     "S105",   # SSO_TOKEN_URL is a URL, not a password
 ]
+"scripts/**/*.py" = [
+    "D",      # No docstring requirements in scripts
+    "T20",    # Allow print in scripts (CLI output)
+    "ANN",    # No annotation requirements in scripts
+    "S105",   # URL constants that look like passwords
+    "S310",   # URL open is expected in these scripts
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

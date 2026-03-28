@@ -31,10 +31,12 @@ def main() -> None:
         sys.exit(0)
 
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    data = urllib.parse.urlencode({
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-    }).encode()
+    data = urllib.parse.urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+        }
+    ).encode()
 
     req = urllib.request.Request(
         ESI_TOKEN_URL,
@@ -49,7 +51,7 @@ def main() -> None:
     try:
         with urllib.request.urlopen(req) as resp:
             access_token: str = json.loads(resp.read())["access_token"]
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"[ERROR] Failed to fetch ESI access token: {exc}")
         sys.exit(1)
 

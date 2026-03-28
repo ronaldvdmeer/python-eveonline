@@ -38,24 +38,26 @@ CALLBACK_PORT = 12345
 CALLBACK_URL = f"http://localhost:{CALLBACK_PORT}/callback"
 
 # All scopes required by the integration tests
-INTEGRATION_SCOPES = " ".join([
-    "esi-location.read_online.v1",
-    "esi-location.read_location.v1",
-    "esi-location.read_ship_type.v1",
-    "esi-wallet.read_character_wallet.v1",
-    "esi-skills.read_skills.v1",
-    "esi-skills.read_skillqueue.v1",
-    "esi-characters.read_fatigue.v1",
-    "esi-mail.read_mail.v1",
-    "esi-industry.read_character_jobs.v1",
-    "esi-markets.read_character_orders.v1",
-    "esi-characters.read_notifications.v1",
-    "esi-clones.read_clones.v1",
-    "esi-clones.read_implants.v1",
-    "esi-characters.read_contacts.v1",
-    "esi-calendar.read_calendar_events.v1",
-    "esi-characters.read_loyalty.v1",
-])
+INTEGRATION_SCOPES = " ".join(
+    [
+        "esi-location.read_online.v1",
+        "esi-location.read_location.v1",
+        "esi-location.read_ship_type.v1",
+        "esi-wallet.read_character_wallet.v1",
+        "esi-skills.read_skills.v1",
+        "esi-skills.read_skillqueue.v1",
+        "esi-characters.read_fatigue.v1",
+        "esi-mail.read_mail.v1",
+        "esi-industry.read_character_jobs.v1",
+        "esi-markets.read_character_orders.v1",
+        "esi-characters.read_notifications.v1",
+        "esi-clones.read_clones.v1",
+        "esi-clones.read_implants.v1",
+        "esi-characters.read_contacts.v1",
+        "esi-calendar.read_calendar_events.v1",
+        "esi-characters.read_loyalty.v1",
+    ]
+)
 
 
 # ---------------------------------------------------------------------------
@@ -67,7 +69,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
     auth_code: str | None = None
     state_received: str | None = None
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         params = urllib.parse.parse_qs(parsed.query)
 
@@ -81,7 +83,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def log_message(self, fmt: str, *args: Any) -> None:  # noqa: ANN401
+    def log_message(self, fmt: str, *args: Any) -> None:
         pass  # suppress access log noise
 
 
@@ -91,10 +93,12 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 def _exchange_code(client_id: str, client_secret: str, code: str) -> dict[str, Any]:
     """Exchange an authorization code for access + refresh tokens."""
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    data = urllib.parse.urlencode({
-        "grant_type": "authorization_code",
-        "code": code,
-    }).encode()
+    data = urllib.parse.urlencode(
+        {
+            "grant_type": "authorization_code",
+            "code": code,
+        }
+    ).encode()
     req = urllib.request.Request(
         ESI_SSO_TOKEN,
         data=data,
