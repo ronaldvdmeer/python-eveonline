@@ -56,7 +56,7 @@ def _character_id_from_token(token: str) -> int:
         payload = json.loads(base64.b64decode(payload_b64))
         sub: str = payload.get("sub", "")
         return int(sub.split(":")[-1])
-    except Exception:  # noqa: BLE001
+    except Exception:
         return _CHARACTER_ID
 
 
