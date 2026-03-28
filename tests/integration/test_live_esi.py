@@ -78,9 +78,7 @@ class _StaticTokenAuth(AbstractAuth):
 
 # Character ID for authenticated tests: derived from the JWT when available,
 # otherwise falls back to the explicit env var or the default character.
-_AUTH_CHARACTER_ID: int = (
-    _character_id_from_token(_ESI_TOKEN) if _ESI_TOKEN else _CHARACTER_ID
-)
+_AUTH_CHARACTER_ID: int = _character_id_from_token(_ESI_TOKEN) if _ESI_TOKEN else _CHARACTER_ID
 
 
 # ---------------------------------------------------------------------------
