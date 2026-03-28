@@ -87,6 +87,8 @@ class EveOnlineClient:
         """
         self._auth = auth
         self._host = host
+        # ETag cache: maps cache_key -> (etag, cached_response_data)
+        self._etag_cache: dict[str, tuple[str, Any]] = {}
 
         if auth is not None:
             self._session = auth.websession
@@ -100,8 +102,54 @@ class EveOnlineClient:
     # Internal helpers
     # -------------------------------------------------------------------------
 
+    def _etag_key(self, path: str, params: dict[str, Any], authenticated: bool) -> str:
+        """Build a deterministic cache key for an ESI endpoint.
+
+        Args:
+            path: API path relative to the ESI base URL.
+            params: Query parameters (must already contain ``datasource``).
+            authenticated: Whether the request uses OAuth.
+
+        Returns:
+            A string key unique to this endpoint + parameter combination.
+        """
+        sorted_params = "&".join(f"{k}={v}" for k, v in sorted(params.items()))
+        auth_prefix = "auth" if authenticated else "pub"
+        return f"{auth_prefix}:{path}?{sorted_params}"
+
+    def _build_etag_headers(self, method: str, cache_key: str) -> dict[str, str]:
+        """Return an ``If-None-Match`` header dict if a cached ETag exists.
+
+        Args:
+            method: HTTP method (only ``"GET"`` uses ETags).
+            cache_key: Cache key produced by :meth:`_etag_key`.
+
+        Returns:
+            A headers dict with ``If-None-Match`` set, or an empty dict.
+        """
+        if method == "GET" and cache_key in self._etag_cache:
+            return {"If-None-Match": self._etag_cache[cache_key][0]}
+        return {}
+
+    def _store_etag(self, method: str, cache_key: str, response: Any, data: Any) -> None:
+        """Cache the ETag from a successful GET response.
+
+        Args:
+            method: HTTP method (only ``"GET"`` responses are cached).
+            cache_key: Cache key produced by :meth:`_etag_key`.
+            response: The aiohttp response object.
+            data: Parsed JSON data to cache alongside the ETag.
+        """
+        etag = response.headers.get("ETag")
+        if method == "GET" and etag:
+            self._etag_cache[cache_key] = (etag, data)
+
     async def _request(self, method: str, path: str, *, authenticated: bool = False, **kwargs: Any) -> Any:
         """Make a request to the ESI API.
+
+        GET requests use ETag caching: a cached ``ETag`` is sent as
+        ``If-None-Match``; a ``304 Not Modified`` response returns the
+        previously cached data without consuming bandwidth.
 
         Args:
             method: HTTP method.
@@ -122,18 +170,21 @@ class EveOnlineClient:
         """
         params: dict[str, Any] = dict(kwargs.pop("params", {}) or {})
         params.setdefault("datasource", ESI_DATASOURCE)
+        cache_key = self._etag_key(path, params, authenticated)
+        headers = {**dict(kwargs.pop("headers", {}) or {}), **self._build_etag_headers(method, cache_key)}
 
         try:
             if authenticated:
                 if self._auth is None:
                     msg = "Authentication required but no auth provider configured"
                     raise EveOnlineAuthenticationError(msg)
-                response = await self._auth.request(method, path, params=params, **kwargs)
+                response = await self._auth.request(method, path, params=params, headers=headers, **kwargs)
             else:
                 response = await self._session.request(
                     method,
                     f"{self._host}/{path}",
                     params=params,
+                    headers=headers,
                     **kwargs,
                 )
         except EveOnlineError:
@@ -146,6 +197,10 @@ class EveOnlineClient:
             text = await response.text()
             msg = f"Authentication failed ({response.status}): {text}"
             raise EveOnlineAuthenticationError(msg)
+
+        if response.status == 304:
+            # Not Modified — return the data we cached earlier.
+            return self._etag_cache[cache_key][1]
 
         if response.status == 404:
             msg = f"Resource not found: {path}"
@@ -166,7 +221,9 @@ class EveOnlineClient:
             msg = f"ESI API error ({response.status}): {text}"
             raise EveOnlineError(msg)
 
-        return await response.json()
+        data = await response.json()
+        self._store_etag(method, cache_key, response, data)
+        return data
 
     @staticmethod
     def _parse_datetime(value: str | None) -> datetime | None:
