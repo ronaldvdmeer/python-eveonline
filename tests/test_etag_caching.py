@@ -492,3 +492,21 @@ class TestETagEdgeCases:
 
         assert len(client_a._etag_cache) == 1
         assert len(client_b._etag_cache) == 0
+
+    @pytest.mark.asyncio
+    async def test_clear_etag_cache(self):
+        """clear_etag_cache() empties the cache so next request fetches fresh data."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+
+            with aioresponses() as mocked:
+                mocked.get(
+                    f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                    payload=_SERVER_STATUS,
+                    headers={"ETag": '"will-be-cleared"'},
+                )
+                await client.async_get_server_status()
+
+            assert len(client._etag_cache) == 1
+            client.clear_etag_cache()
+            assert client._etag_cache == {}
