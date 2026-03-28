@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       run_integration:
-        description: "Force-run integration tests (ESI_TOKEN secret required)"
+        description: "Force-run integration tests (ESI_CLIENT_ID / ESI_CLIENT_SECRET / ESI_REFRESH_TOKEN secrets required)"
         type: boolean
         default: false
 
@@ -92,12 +92,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install ".[dev]"
 
-      - name: Run integration tests
-        # Public tests (server status, name resolution, character info) always run.
-        # Authenticated tests skip automatically when ESI_TOKEN is empty or not
-        # configured as a repository secret (e.g. on fork PRs).
+      - name: Fetch ESI access token
+        # Exchanges the long-lived refresh token for a short-lived access token.
+        # Exits cleanly (no-op) when secrets are not configured, e.g. on fork PRs.
         env:
-          ESI_TOKEN: ${{ secrets.ESI_TOKEN }}
+          ESI_CLIENT_ID: ${{ secrets.ESI_CLIENT_ID }}
+          ESI_CLIENT_SECRET: ${{ secrets.ESI_CLIENT_SECRET }}
+          ESI_REFRESH_TOKEN: ${{ secrets.ESI_REFRESH_TOKEN }}
+        run: python scripts/fetch_esi_token_ci.py
+
+      - name: Run integration tests
+        # Public tests always run. Authenticated tests skip automatically when
+        # ESI_TOKEN is empty (i.e. secrets were not configured).
+        env:
           ESI_TEST_CHARACTER_ID: ${{ secrets.ESI_TEST_CHARACTER_ID }}
         run: pytest tests/integration/ -m integration --no-cov -v
 
