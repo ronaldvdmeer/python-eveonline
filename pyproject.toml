@@ -59,6 +59,9 @@ addopts = [
     "--cov-fail-under=90",
     "-v",
 ]
+markers = [
+    "integration: marks tests as integration tests requiring live ESI access (deselect with '-m \"not integration\"')",
+]
 
 # -- coverage ----------------------------------------------------------------
 [tool.coverage.run]
