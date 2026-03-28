@@ -98,6 +98,10 @@ class EveOnlineClient:
             msg = "Either 'session' or 'auth' must be provided"
             raise EveOnlineError(msg)
 
+    def clear_etag_cache(self) -> None:
+        """Clear the ETag cache, forcing fresh responses on the next requests."""
+        self._etag_cache.clear()
+
     # -------------------------------------------------------------------------
     # Internal helpers
     # -------------------------------------------------------------------------
