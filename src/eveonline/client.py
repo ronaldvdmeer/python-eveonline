@@ -165,7 +165,7 @@ class EveOnlineClient:
             response: The aiohttp response object.
 
         Returns:
-            A UTC-aware :class:`datetime` from the ``Expires`` header, or
+            A timezone-aware :class:`datetime` from the ``Expires`` header, or
             ``None`` if the header is absent or cannot be parsed.
         """
         if not (expires_str := response.headers.get("Expires")):
@@ -218,10 +218,13 @@ class EveOnlineClient:
     async def _finalize_response(self, method: str, cache_key: str, response: Any) -> tuple[Any, int]:
         """Parse the response JSON, store ETag/Expires, and return ``(data, x_pages)``.
 
+        Used for any successful 2xx response. ETag/Expires-based caching is only
+        applied for ``GET`` requests (see :meth:`_store_etag`).
+
         Args:
             method: HTTP method used for the request.
             cache_key: Cache key produced by :meth:`_etag_key`.
-            response: The aiohttp response object for a successful 2xx GET.
+            response: The aiohttp response object for a successful 2xx response.
 
         Returns:
             A ``(data, x_pages)`` tuple ready to be returned by the caller.

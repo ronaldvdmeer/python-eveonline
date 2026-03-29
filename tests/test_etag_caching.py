@@ -611,6 +611,13 @@ class TestExpiresTTLCaching:
                 )
                 result = await client.async_get_server_status()
 
+            # Verify that an HTTP request was made with the stored ETag.
+            assert mocked.requests, "Expected an HTTP request after cache expiry"
+            (_method, _url), calls = next(iter(mocked.requests.items()))
+            assert _method == "GET"
+            sent_headers = calls[0].kwargs.get("headers") or {}
+            assert sent_headers.get("If-None-Match") == '"abc"'
+
         assert result.players == _SERVER_STATUS["players"]
 
     @pytest.mark.asyncio
