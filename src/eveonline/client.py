@@ -252,7 +252,10 @@ class EveOnlineClient:
             raise EveOnlineError(msg)
 
         data = await response.json()
-        x_pages = int(response.headers.get("X-Pages", "1"))
+        try:
+            x_pages = int(response.headers.get("X-Pages", "1"))
+        except (TypeError, ValueError):
+            x_pages = 1
         self._store_etag(method, cache_key, response, data, x_pages=x_pages)
         return data, x_pages
 
