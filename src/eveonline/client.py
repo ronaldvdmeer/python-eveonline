@@ -222,7 +222,7 @@ class EveOnlineClient:
 
         if response.status == 304:
             # Not Modified — return the data we cached earlier if it still exists.
-            await response.release()
+            response.release()
             if (cached := self._etag_cache.get(cache_key)) is None:
                 msg = (
                     f"Received 304 Not Modified from ESI, but no matching ETag "
@@ -232,10 +232,12 @@ class EveOnlineClient:
             return cached[1]
 
         if response.status == 404:
+            response.release()
             msg = f"Resource not found: {path}"
             raise EveOnlineNotFoundError(msg)
 
         if response.status in (420, 429):
+            response.release()
             raise EveOnlineRateLimitError(retry_after=self._parse_retry_after(response))
 
         if response.status >= 400:
