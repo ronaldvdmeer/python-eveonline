@@ -523,3 +523,20 @@ class TestETagEdgeCases:
             assert len(client._etag_cache) == 1
             client.clear_etag_cache()
             assert client._etag_cache == {}
+
+    @pytest.mark.asyncio
+    async def test_malformed_x_pages_header_defaults_to_single_page(self):
+        """A non-integer X-Pages header falls back to 1 without raising."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                payload={"players": 5000, "server_version": "DEADSPACE", "start_time": "2025-01-01T00:00:00Z"},
+                headers={"ETag": '"abc"', "X-Pages": "not-a-number"},
+            )
+            async with aiohttp.ClientSession() as session:
+                client = EveOnlineClient(session=session)
+                result = await client.async_get_server_status()
+
+        assert result.players == 5000
+        cache_key = client._etag_key("status/", {"datasource": "tranquility"}, authenticated=False)
+        assert client._etag_cache[cache_key][2] == 1

@@ -88,8 +88,8 @@ class EveOnlineClient:
         """
         self._auth = auth
         self._host = host
-        # ETag cache: maps cache_key -> (etag, cached_response_data)
-        self._etag_cache: dict[str, tuple[str, Any]] = {}
+        # ETag cache: maps cache_key -> (etag, cached_response_data, x_pages)
+        self._etag_cache: dict[str, tuple[str, Any, int]] = {}
 
         if auth is not None:
             self._session = auth.websession
@@ -136,7 +136,7 @@ class EveOnlineClient:
             return {"If-None-Match": self._etag_cache[cache_key][0]}
         return {}
 
-    def _store_etag(self, method: str, cache_key: str, response: Any, data: Any) -> None:
+    def _store_etag(self, method: str, cache_key: str, response: Any, data: Any, *, x_pages: int = 1) -> None:
         """Cache the ETag from a successful GET response.
 
         Args:
@@ -144,10 +144,11 @@ class EveOnlineClient:
             cache_key: Cache key produced by :meth:`_etag_key`.
             response: The aiohttp response object.
             data: Parsed JSON data to cache alongside the ETag.
+            x_pages: Total number of pages from the ``X-Pages`` header.
         """
         etag = response.headers.get("ETag")
         if method == "GET" and etag:
-            self._etag_cache[cache_key] = (etag, data)
+            self._etag_cache[cache_key] = (etag, data, x_pages)
 
     @staticmethod
     def _parse_retry_after(response: Any) -> int | None:
@@ -167,8 +168,10 @@ class EveOnlineClient:
         except ValueError:
             return None
 
-    async def _request(self, method: str, path: str, *, authenticated: bool = False, **kwargs: Any) -> Any:
-        """Make a request to the ESI API.
+    async def _request_full(
+        self, method: str, path: str, *, authenticated: bool = False, **kwargs: Any
+    ) -> tuple[Any, int]:
+        """Make a request to the ESI API and return the data with pagination info.
 
         GET requests use ETag caching: a cached ``ETag`` is sent as
         ``If-None-Match``; a ``304 Not Modified`` response returns the
@@ -181,7 +184,9 @@ class EveOnlineClient:
             **kwargs: Additional arguments for the HTTP request.
 
         Returns:
-            Parsed JSON response.
+            A ``(data, x_pages)`` tuple where *data* is the parsed JSON
+            response and *x_pages* is the total number of pages from the
+            ``X-Pages`` response header (``1`` if the header is absent).
 
         Raises:
             EveOnlineAuthenticationError: If auth is required but not provided,
@@ -230,7 +235,7 @@ class EveOnlineClient:
                     f"cache entry exists for key {cache_key!r}."
                 )
                 raise EveOnlineError(msg)
-            return cached[1]
+            return cached[1], cached[2]
 
         if response.status == 404:
             response.release()
@@ -247,8 +252,60 @@ class EveOnlineClient:
             raise EveOnlineError(msg)
 
         data = await response.json()
-        self._store_etag(method, cache_key, response, data)
+        try:
+            x_pages = int(response.headers.get("X-Pages", "1"))
+        except (TypeError, ValueError):
+            x_pages = 1
+        self._store_etag(method, cache_key, response, data, x_pages=x_pages)
+        return data, x_pages
+
+    async def _request(self, method: str, path: str, *, authenticated: bool = False, **kwargs: Any) -> Any:
+        """Make a request to the ESI API.
+
+        Thin wrapper around :meth:`_request_full` that discards pagination
+        metadata. Use for non-paginated endpoints.
+
+        Args:
+            method: HTTP method.
+            path: API path relative to ESI base URL.
+            authenticated: Whether this request requires authentication.
+            **kwargs: Additional arguments for the HTTP request.
+
+        Returns:
+            Parsed JSON response.
+        """
+        data, _ = await self._request_full(method, path, authenticated=authenticated, **kwargs)
         return data
+
+    async def _request_all_pages(self, path: str, *, authenticated: bool = False, **kwargs: Any) -> list[Any]:
+        """Fetch all pages of a paginated ESI GET endpoint.
+
+        Sends ``?page=1``, reads the ``X-Pages`` response header to determine
+        the total page count, then fetches any remaining pages sequentially.
+        Results from all pages are combined into a single flat list.
+
+        Args:
+            path: API path relative to ESI base URL.
+            authenticated: Whether this request requires authentication.
+            **kwargs: Additional arguments forwarded to each page request.
+
+        Returns:
+            A flat list containing the combined JSON objects from all pages.
+        """
+        base_params: dict[str, Any] = dict(kwargs.pop("params", {}) or {})
+
+        page1_data, total_pages = await self._request_full(
+            "GET", path, authenticated=authenticated, params={**base_params, "page": 1}, **kwargs
+        )
+        all_data: list[Any] = list(page1_data)
+
+        for page in range(2, total_pages + 1):
+            page_data, _ = await self._request_full(
+                "GET", path, authenticated=authenticated, params={**base_params, "page": page}, **kwargs
+            )
+            all_data.extend(page_data)
+
+        return all_data
 
     @staticmethod
     @overload
@@ -681,15 +738,19 @@ class EveOnlineClient:
     async def async_get_wallet_journal(self, character_id: int) -> list[WalletJournalEntry]:
         """Get a character's wallet journal (recent transactions).
 
+        All pages are fetched automatically. ESI returns up to 50 entries
+        per page; characters with long transaction histories will require
+        multiple pages.
+
         Requires scope: ``esi-wallet.read_character_wallet.v1``
 
         Args:
             character_id: The Eve Online character ID.
 
         Returns:
-            List of WalletJournalEntry entries, newest first.
+            List of WalletJournalEntry entries across all pages, newest first.
         """
-        data = await self._request("GET", f"characters/{character_id}/wallet/journal/", authenticated=True)
+        data = await self._request_all_pages(f"characters/{character_id}/wallet/journal/", authenticated=True)
         return [
             WalletJournalEntry(
                 id=entry["id"],
@@ -708,15 +769,18 @@ class EveOnlineClient:
     async def async_get_contacts(self, character_id: int) -> list[CharacterContact]:
         """Get a character's contacts.
 
+        All pages are fetched automatically. ESI returns up to 500 contacts
+        per page.
+
         Requires scope: ``esi-characters.read_contacts.v1``
 
         Args:
             character_id: The Eve Online character ID.
 
         Returns:
-            List of CharacterContact entries.
+            List of CharacterContact entries across all pages.
         """
-        data = await self._request("GET", f"characters/{character_id}/contacts/", authenticated=True)
+        data = await self._request_all_pages(f"characters/{character_id}/contacts/", authenticated=True)
         return [
             CharacterContact(
                 contact_id=entry["contact_id"],
@@ -775,9 +839,8 @@ class EveOnlineClient:
     async def async_get_killmails(self, character_id: int) -> list[CharacterKillmail]:
         """Get a character's recent killmail references.
 
-        Returns references (ID + hash) for recent kills and losses.
-        Only the first page of results is returned; ESI may have additional
-        pages for characters with very high activity.
+        All pages are fetched automatically. ESI returns up to 50 entries
+        per page; characters with high kill activity will require multiple pages.
 
         Requires scope: ``esi-killmails.read_killmails.v1``
 
@@ -785,9 +848,9 @@ class EveOnlineClient:
             character_id: The Eve Online character ID.
 
         Returns:
-            List of CharacterKillmail entries with killmail_id and killmail_hash.
+            List of CharacterKillmail entries across all pages.
         """
-        data = await self._request("GET", f"characters/{character_id}/killmails/recent/", authenticated=True)
+        data = await self._request_all_pages(f"characters/{character_id}/killmails/recent/", authenticated=True)
         return [
             CharacterKillmail(
                 killmail_id=entry["killmail_id"],
