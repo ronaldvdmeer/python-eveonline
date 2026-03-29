@@ -63,9 +63,6 @@ addopts = [
 markers = [
     "integration: live ESI API tests — require network access; authenticated tests also require ESI_TOKEN env var",
 ]
-markers = [
-    "integration: marks tests as integration tests requiring live ESI access (deselect with '-m \"not integration\"')",
-]
 
 # -- coverage ----------------------------------------------------------------
 [tool.coverage.run]
