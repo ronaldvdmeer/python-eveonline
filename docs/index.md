@@ -9,6 +9,14 @@ Async Python client library for the [Eve Online ESI API](https://esi.evetech.net
 - [**Endpoints**](endpoints.md) — Full reference of all available API methods
 - [**Error Handling**](error-handling.md) — Exception hierarchy and best practices
 
+## Key features
+
+- **Two-layer caching** — respects the ESI `Expires` header to skip HTTP requests entirely within the cache window, and sends `If-None-Match` / ETag headers so unchanged responses return HTTP 304 without a response body. Both layers work automatically with no configuration required.
+- **Automatic pagination** — paginated endpoints (`async_get_wallet_journal()`, `async_get_contacts()`, `async_get_killmails()`) fetch all pages transparently and return a single combined list.
+- **23 endpoints** covering public and auth-gated ESI resources — see [Endpoints](endpoints.md) for the full list.
+- **Typed models** — all responses are frozen dataclasses with full type annotations and PEP 561 `py.typed` marker.
+- **Abstract auth** — bring your own token source by implementing `AbstractAuth`.
+
 ## At a glance
 
 ```python
