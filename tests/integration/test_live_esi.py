@@ -29,7 +29,6 @@ import pytest
 
 from eveonline.auth import AbstractAuth
 from eveonline.client import EveOnlineClient
-from eveonline.exceptions import EveOnlineAuthenticationError
 
 # ---------------------------------------------------------------------------
 # Read environment variables once at module level so skip decorators work.
@@ -400,14 +399,8 @@ async def test_jump_fatigue_live(auth_client: EveOnlineClient) -> None:
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_killmails_live(auth_client: EveOnlineClient) -> None:
-    """Killmails returns a list; non-empty entries have a positive ID and non-empty hash.
-
-    Skips gracefully when the token lacks ``esi-killmails.read_killmails.v1``.
-    """
-    try:
-        killmails = await auth_client.async_get_killmails(_AUTH_CHARACTER_ID)
-    except EveOnlineAuthenticationError:
-        pytest.skip("ESI token does not have the esi-killmails.read_killmails.v1 scope")
+    """Killmails returns a list; non-empty entries have a positive ID and non-empty hash."""
+    killmails = await auth_client.async_get_killmails(_AUTH_CHARACTER_ID)
 
     assert isinstance(killmails, list)
     if killmails:
