@@ -122,6 +122,12 @@ Returns an empty list when called with an empty `ids` list.
 
 All authenticated endpoints require `EveOnlineClient(auth=...)`. See [Authentication](authentication.md) for scope details.
 
+### Pagination
+
+Some ESI endpoints return data across multiple pages. The client handles this automatically using the `X-Pages` response header: it fetches page 1, reads the total page count, then sequentially fetches any remaining pages and returns a single combined list. No extra code is needed — just call the method as usual.
+
+Endpoints that use automatic pagination are marked with *all pages fetched automatically* in their return type description.
+
 ---
 
 ### `async_get_character_online(character_id)`
@@ -406,7 +412,9 @@ for entry in journal[:5]:
     print(f"{entry.date}: {entry.ref_type} {entry.amount:+,.2f} ISK")
 ```
 
-**Returns:** `list[WalletJournalEntry]`
+**Returns:** `list[WalletJournalEntry]` — all pages fetched automatically
+
+> ESI returns up to 50 entries per page. The client fetches all pages and returns the combined result.
 
 | Field | Type | Description |
 |---|---|---|
@@ -432,7 +440,9 @@ friends = [c for c in contacts if c.standing > 0]
 print(f"{len(friends)} friendly contacts")
 ```
 
-**Returns:** `list[CharacterContact]`
+**Returns:** `list[CharacterContact]` — all pages fetched automatically
+
+> ESI returns up to 500 contacts per page. The client fetches all pages and returns the combined result.
 
 | Field | Type | Description |
 |---|---|---|
@@ -483,3 +493,24 @@ for entry in lp:
 |---|---|---|
 | `corporation_id` | `int` | Corporation ID |
 | `loyalty_points` | `int` | LP accumulated |
+
+---
+
+### `async_get_killmails(character_id)`
+
+Scope: `esi-killmails.read_killmails.v1`
+
+```python
+killmails = await client.async_get_killmails(character_id)
+for km in killmails:
+    print(f"Killmail {km.killmail_id} — hash {km.killmail_hash}")
+```
+
+**Returns:** `list[CharacterKillmail]` — all pages fetched automatically
+
+> ESI returns up to 50 entries per page. The client fetches all pages and returns the combined result.
+
+| Field | Type | Description |
+|---|---|---|
+| `killmail_id` | `int` | Unique killmail identifier |
+| `killmail_hash` | `str` | Hash required to fetch the full killmail detail |

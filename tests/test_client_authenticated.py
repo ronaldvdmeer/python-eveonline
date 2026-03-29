@@ -857,10 +857,10 @@ class TestWalletJournal:
 
     @pytest.mark.asyncio
     async def test_get_wallet_journal_success(self, wallet_journal_data):
-        """Successful wallet journal fetch."""
+        """Successful wallet journal fetch (single page)."""
         with aioresponses() as mocked:
             mocked.get(
-                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/wallet/journal/?datasource=tranquility",
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/wallet/journal/?datasource=tranquility&page=1",
                 payload=wallet_journal_data,
             )
             async with aiohttp.ClientSession() as session:
@@ -890,7 +890,7 @@ class TestWalletJournal:
         """No journal entries returns empty list."""
         with aioresponses() as mocked:
             mocked.get(
-                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/wallet/journal/?datasource=tranquility",
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/wallet/journal/?datasource=tranquility&page=1",
                 payload=[],
             )
             async with aiohttp.ClientSession() as session:
@@ -900,16 +900,58 @@ class TestWalletJournal:
 
         assert journal == []
 
+    @pytest.mark.asyncio
+    async def test_get_wallet_journal_multiple_pages(self):
+        """Wallet journal spanning two pages returns combined results."""
+        page1 = [
+            {
+                "id": 1,
+                "date": "2026-03-27T12:00:00Z",
+                "ref_type": "bounty_prizes",
+                "description": "Bounties",
+                "amount": 1000000.0,
+                "balance": 2000000.0,
+            }
+        ]
+        page2 = [
+            {
+                "id": 2,
+                "date": "2026-03-26T10:00:00Z",
+                "ref_type": "market_escrow",
+                "description": "Escrow",
+                "amount": -500000.0,
+                "balance": 1000000.0,
+            }
+        ]
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/wallet/journal/?datasource=tranquility&page=1",
+                payload=page1,
+                headers={"X-Pages": "2"},
+            )
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/wallet/journal/?datasource=tranquility&page=2",
+                payload=page2,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                journal = await client.async_get_wallet_journal(CHARACTER_ID)
+
+        assert len(journal) == 2
+        assert journal[0].id == 1
+        assert journal[1].id == 2
+
 
 class TestContacts:
     """Test GET /characters/{character_id}/contacts/ endpoint."""
 
     @pytest.mark.asyncio
     async def test_get_contacts_success(self, contacts_data):
-        """Successful contacts fetch."""
+        """Successful contacts fetch (single page)."""
         with aioresponses() as mocked:
             mocked.get(
-                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/contacts/?datasource=tranquility",
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/contacts/?datasource=tranquility&page=1",
                 payload=contacts_data,
             )
             async with aiohttp.ClientSession() as session:
@@ -939,7 +981,7 @@ class TestContacts:
         """No contacts returns empty list."""
         with aioresponses() as mocked:
             mocked.get(
-                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/contacts/?datasource=tranquility",
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/contacts/?datasource=tranquility&page=1",
                 payload=[],
             )
             async with aiohttp.ClientSession() as session:
@@ -948,6 +990,34 @@ class TestContacts:
                 contacts = await client.async_get_contacts(CHARACTER_ID)
 
         assert contacts == []
+
+    @pytest.mark.asyncio
+    async def test_get_contacts_multiple_pages(self):
+        """Contacts spanning two pages returns combined results."""
+        page1 = [
+            {"contact_id": 111, "contact_type": "character", "standing": 5.0},
+        ]
+        page2 = [
+            {"contact_id": 222, "contact_type": "corporation", "standing": -5.0},
+        ]
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/contacts/?datasource=tranquility&page=1",
+                payload=page1,
+                headers={"X-Pages": "2"},
+            )
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/contacts/?datasource=tranquility&page=2",
+                payload=page2,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                contacts = await client.async_get_contacts(CHARACTER_ID)
+
+        assert len(contacts) == 2
+        assert contacts[0].contact_id == 111
+        assert contacts[1].contact_id == 222
 
 
 class TestCalendar:
@@ -1044,10 +1114,10 @@ class TestKillmails:
 
     @pytest.mark.asyncio
     async def test_get_killmails_success(self, killmails_data):
-        """Successful killmails fetch with multiple entries."""
+        """Successful killmails fetch with multiple entries (single page)."""
         with aioresponses() as mocked:
             mocked.get(
-                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility",
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility&page=1",
                 payload=killmails_data,
             )
             async with aiohttp.ClientSession() as session:
@@ -1071,7 +1141,7 @@ class TestKillmails:
         """No recent killmails returns empty list."""
         with aioresponses() as mocked:
             mocked.get(
-                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility",
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility&page=1",
                 payload=[],
             )
             async with aiohttp.ClientSession() as session:
@@ -1086,7 +1156,7 @@ class TestKillmails:
         """HTTP 404 raises EveOnlineNotFoundError."""
         with aioresponses() as mocked:
             mocked.get(
-                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility",
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility&page=1",
                 status=404,
                 body="Character not found",
             )
@@ -1095,3 +1165,27 @@ class TestKillmails:
                 client = EveOnlineClient(auth=auth)
                 with pytest.raises(EveOnlineNotFoundError):
                     await client.async_get_killmails(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_get_killmails_multiple_pages(self):
+        """Killmails spanning two pages returns combined results."""
+        page1 = [{"killmail_id": 100, "killmail_hash": "aaa"}]
+        page2 = [{"killmail_id": 101, "killmail_hash": "bbb"}]
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility&page=1",
+                payload=page1,
+                headers={"X-Pages": "2"},
+            )
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility&page=2",
+                payload=page2,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                killmails = await client.async_get_killmails(CHARACTER_ID)
+
+        assert len(killmails) == 2
+        assert killmails[0].killmail_id == 100
+        assert killmails[1].killmail_id == 101
