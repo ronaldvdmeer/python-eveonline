@@ -150,11 +150,32 @@ class EveOnlineClient:
         """
         etag = response.headers.get("ETag")
         if method == "GET" and etag:
-            expires_at: datetime | None = None
-            if expires_str := response.headers.get("Expires"):
-                with contextlib.suppress(TypeError, ValueError):
-                    expires_at = parsedate_to_datetime(expires_str)
-            self._etag_cache[cache_key] = (etag, data, x_pages, expires_at)
+            self._etag_cache[cache_key] = (
+                etag,
+                data,
+                x_pages,
+                self._parse_expires(response),
+            )
+
+    @staticmethod
+    def _parse_expires(response: Any) -> datetime | None:
+        """Parse the ``Expires`` header into a timezone-aware datetime.
+
+        Args:
+            response: The aiohttp response object.
+
+        Returns:
+            A UTC-aware :class:`datetime` from the ``Expires`` header, or
+            ``None`` if the header is absent or cannot be parsed.
+        """
+        if not (expires_str := response.headers.get("Expires")):
+            return None
+        with contextlib.suppress(TypeError, ValueError):
+            parsed: datetime = parsedate_to_datetime(expires_str)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed
+        return None
 
     @staticmethod
     def _parse_retry_after(response: Any) -> int | None:
@@ -218,9 +239,15 @@ class EveOnlineClient:
     ) -> tuple[Any, int]:
         """Make a request to the ESI API and return the data with pagination info.
 
-        GET requests use ETag caching: a cached ``ETag`` is sent as
-        ``If-None-Match``; a ``304 Not Modified`` response returns the
-        previously cached data without consuming bandwidth.
+        Two caching layers are applied for GET requests:
+
+        1. **TTL caching** — if a cache entry exists with an ``Expires`` value
+           that has not passed, the cached data is returned immediately without
+           making any HTTP request.
+        2. **ETag caching** — when the TTL has expired (or no ``Expires`` was
+           stored), a ``If-None-Match`` header is sent if a cached ETag exists.
+           A ``304 Not Modified`` response returns the previously cached data
+           without downloading a response body.
 
         Args:
             method: HTTP method.
@@ -278,6 +305,7 @@ class EveOnlineClient:
 
         if response.status == 304:
             # Not Modified — return the data we cached earlier if it still exists.
+            # Also refresh the Expires timestamp if the server sent an updated one.
             response.release()
             if (cached := self._etag_cache.get(cache_key)) is None:
                 msg = (
@@ -285,6 +313,8 @@ class EveOnlineClient:
                     f"cache entry exists for key {cache_key!r}."
                 )
                 raise EveOnlineError(msg)
+            expires_at = self._parse_expires(response) or cached[3]
+            self._etag_cache[cache_key] = (cached[0], cached[1], cached[2], expires_at)
             return cached[1], cached[2]
 
         if response.status == 404:

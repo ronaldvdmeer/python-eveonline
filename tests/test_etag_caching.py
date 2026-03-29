@@ -572,19 +572,19 @@ class TestExpiresTTLCaching:
     async def test_fresh_cache_skips_http_request(self):
         """A cached entry with Expires in the future is returned without making an HTTP request."""
         future_expires = formatdate(time.time() + 3600, usegmt=True)
+        url = f"{ESI_BASE_URL}/status/?datasource=tranquility"
         async with aiohttp.ClientSession() as session:
             client = EveOnlineClient(session=session)
 
             with aioresponses() as mocked:
                 mocked.get(
-                    f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                    url,
                     payload=_SERVER_STATUS,
                     headers={"ETag": '"abc"', "Expires": future_expires},
                 )
                 result1 = await client.async_get_server_status()
-
-            # No mock registered — would raise ConnectionError if HTTP is attempted.
-            result2 = await client.async_get_server_status()
+                # Second call — no additional mock registered; must be served from cache.
+                result2 = await client.async_get_server_status()
 
         assert result1 == result2
 
