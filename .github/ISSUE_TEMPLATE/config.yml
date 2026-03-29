@@ -1,8 +1,8 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 
 contact_links:
   - name: Home Assistant Core Issues
     url: https://github.com/home-assistant/core/issues
-    about: >
-      If you are experiencing issues with the Home Assistant EVE Online integration
-      (not the python-eveonline library itself), please report them in the HA Core repository.
+    about: >-
+      Experiencing issues with the Home Assistant EVE Online integration
+      (not the python-eveonline library itself)? Report them in the HA Core repository.

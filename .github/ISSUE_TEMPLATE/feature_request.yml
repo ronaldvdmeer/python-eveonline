@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest a new ESI endpoint or library feature
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: What would you like to see?
+      description: Describe the feature or endpoint you want added.
+    validations:
+      required: true
+
+  - type: input
+    id: endpoint
+    attributes:
+      label: ESI endpoint (if applicable)
+      description: Link to the ESI Swagger UI entry for the endpoint you want supported.
+      placeholder: "https://esi.evetech.net/ui/#/..."
+
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Use case
+      description: Why is this needed? What problem does it solve?
+    validations:
+      required: true
