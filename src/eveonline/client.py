@@ -194,9 +194,7 @@ class EveOnlineClient:
             return cached[1], cached[2]
         return None
 
-    async def _finalize_response(
-        self, method: str, cache_key: str, response: Any
-    ) -> tuple[Any, int]:
+    async def _finalize_response(self, method: str, cache_key: str, response: Any) -> tuple[Any, int]:
         """Parse the response JSON, store ETag/Expires, and return ``(data, x_pages)``.
 
         Args:
