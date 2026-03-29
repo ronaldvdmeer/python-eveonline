@@ -86,23 +86,4 @@ except EveOnlineRateLimitError as err:
 
 ## ESI caching headers
 
-ESI endpoints each have a server-side cache duration. Fetching within the cache window returns the same data. Common cache times:
-
-| Endpoint | Cache duration |
-|---|---|
-| `/status/` | 30 seconds |
-| `/characters/{id}/online/` | 60 seconds |
-| `/characters/{id}/wallet/` | 120 seconds |
-| `/characters/{id}/skills/` | 120 seconds |
-| `/characters/{id}/skillqueue/` | 120 seconds |
-| `/characters/{id}/industry/jobs/` | 300 seconds |
-| `/characters/{id}/orders/` | 1200 seconds |
-| `/universe/names/` | 3600 seconds |
-
-The client can use two layers of caching to minimise ESI traffic, but only when a cacheable response has been received (a GET response that includes an `ETag` header):
-
-1. **TTL caching (`Expires` header)** — When a response is cached, the client stores its `Expires` value alongside the cached data if the header is present. If you call the same endpoint again before that time is reached, the client returns the cached result immediately without making any HTTP request. If no `Expires` value was stored for a cached entry, this layer is skipped and the request falls through to the ETag layer.
-
-2. **ETag caching (`If-None-Match` / 304)** — Once the stored `Expires` time has passed, or when no `Expires` value was stored, the client sends the cached `ETag` in an `If-None-Match` header. If the data has not changed, ESI returns `304 Not Modified` and the client returns the previously cached data without downloading a response body.
-
-Use `client.clear_etag_cache()` to discard both layers and force fresh responses on the next requests.
+The client automatically caches ESI responses to reduce traffic and ESI error-budget consumption. See [Endpoints — Request caching](endpoints.md#request-caching) for the full reference including cache durations, TTL behaviour, ETag/304 handling, and `clear_etag_cache()`.

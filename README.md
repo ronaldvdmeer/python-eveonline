@@ -13,10 +13,10 @@ Built for use with [Home Assistant](https://www.home-assistant.io/) but can be u
 
 - **Fully async** — built on [aiohttp](https://docs.aiohttp.org/)
 - **Typed models** — all API responses are frozen dataclasses with full type annotations
-- **15 endpoints** — public (server, character, corporation, universe) and authenticated (wallet, skills, location, industry, market, mail, fatigue)
+- **23 endpoints** — public (server, character, corporation, universe) and authenticated (wallet, skills, location, industry, market, mail, notifications, clones, fatigue, contacts, calendar, loyalty, killmails)
 - **Abstract auth** — implement `AbstractAuth` to plug in any OAuth2 token source
 - **Type-safe** — PEP 561 compatible (`py.typed`), strict mypy configuration
-- **Tested** — 100% test coverage
+- **Tested** — ≥98% test coverage
 
 ## Installation
 
@@ -44,7 +44,7 @@ asyncio.run(main())
 
 - [**Quickstart**](docs/quickstart.md) — public and authenticated endpoint examples
 - [**Authentication**](docs/authentication.md) — implementing `AbstractAuth`, required OAuth scopes
-- [**Endpoints**](docs/endpoints.md) — full reference with field tables for all 15 methods
+- [**Endpoints**](docs/endpoints.md) — full reference with field tables for all 23 methods
 - [**Error Handling**](docs/error-handling.md) — exception hierarchy, rate limiting, ESI cache times
 
 ## License
