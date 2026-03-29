@@ -56,6 +56,7 @@ INTEGRATION_SCOPES = " ".join(
         "esi-characters.read_contacts.v1",
         "esi-calendar.read_calendar_events.v1",
         "esi-characters.read_loyalty.v1",
+        "esi-killmails.read_killmails.v1",
     ]
 )
 
