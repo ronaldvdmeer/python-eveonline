@@ -20,6 +20,7 @@ from .models import (
     CalendarEvent,
     CharacterClones,
     CharacterContact,
+    CharacterKillmail,
     CharacterLocation,
     CharacterNotification,
     CharacterOnlineStatus,
@@ -767,6 +768,30 @@ class EveOnlineClient:
             LoyaltyPoints(
                 corporation_id=entry["corporation_id"],
                 loyalty_points=entry["loyalty_points"],
+            )
+            for entry in data
+        ]
+
+    async def async_get_killmails(self, character_id: int) -> list[CharacterKillmail]:
+        """Get a character's recent killmail references.
+
+        Returns references (ID + hash) for recent kills and losses.
+        Only the first page of results is returned; ESI may have additional
+        pages for characters with very high activity.
+
+        Requires scope: ``esi-killmails.read_killmails.v1``
+
+        Args:
+            character_id: The Eve Online character ID.
+
+        Returns:
+            List of CharacterKillmail entries with killmail_id and killmail_hash.
+        """
+        data = await self._request("GET", f"characters/{character_id}/killmails/recent/", authenticated=True)
+        return [
+            CharacterKillmail(
+                killmail_id=entry["killmail_id"],
+                killmail_hash=entry["killmail_hash"],
             )
             for entry in data
         ]

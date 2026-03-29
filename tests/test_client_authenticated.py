@@ -15,6 +15,7 @@ from eveonline.models import (
     CalendarEvent,
     CharacterClones,
     CharacterContact,
+    CharacterKillmail,
     CharacterLocation,
     CharacterNotification,
     CharacterOnlineStatus,
@@ -193,6 +194,14 @@ class TestAuthRequired:
             client = EveOnlineClient(session=session)
             with pytest.raises(EveOnlineAuthenticationError):
                 await client.async_get_loyalty_points(CHARACTER_ID)
+
+    @pytest.mark.asyncio
+    async def test_killmails_without_auth_raises(self):
+        """Calling killmails endpoint without auth raises error."""
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+            with pytest.raises(EveOnlineAuthenticationError):
+                await client.async_get_killmails(CHARACTER_ID)
 
 
 class TestCharacterOnline:
@@ -1028,3 +1037,61 @@ class TestLoyaltyPoints:
                 lp = await client.async_get_loyalty_points(CHARACTER_ID)
 
         assert lp == []
+
+
+class TestKillmails:
+    """Test GET /characters/{character_id}/killmails/recent/ endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_killmails_success(self, killmails_data):
+        """Successful killmails fetch with multiple entries."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility",
+                payload=killmails_data,
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                killmails = await client.async_get_killmails(CHARACTER_ID)
+
+        assert len(killmails) == 2
+        assert all(isinstance(km, CharacterKillmail) for km in killmails)
+
+        first = killmails[0]
+        assert first.killmail_id == 112830692
+        assert first.killmail_hash == "a01f278642069a91c09009da6d4b0e0e4c6f9b20"
+
+        second = killmails[1]
+        assert second.killmail_id == 112830693
+        assert second.killmail_hash == "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0"
+
+    @pytest.mark.asyncio
+    async def test_get_killmails_empty(self):
+        """No recent killmails returns empty list."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility",
+                payload=[],
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                killmails = await client.async_get_killmails(CHARACTER_ID)
+
+        assert killmails == []
+
+    @pytest.mark.asyncio
+    async def test_get_killmails_not_found_raises(self):
+        """HTTP 404 raises EveOnlineNotFoundError."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/characters/{CHARACTER_ID}/killmails/recent/?datasource=tranquility",
+                status=404,
+                body="Character not found",
+            )
+            async with aiohttp.ClientSession() as session:
+                auth = MockAuth(session)
+                client = EveOnlineClient(auth=auth)
+                with pytest.raises(EveOnlineNotFoundError):
+                    await client.async_get_killmails(CHARACTER_ID)

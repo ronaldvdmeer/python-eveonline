@@ -13,6 +13,7 @@ from .exceptions import (
     EveOnlineNotFoundError,
     EveOnlineRateLimitError,
 )
+from .models import CharacterKillmail
 
 try:
     __version__ = version("python-eveonline")
@@ -21,6 +22,7 @@ except PackageNotFoundError:
 
 __all__ = [
     "AbstractAuth",
+    "CharacterKillmail",
     "EveOnlineAuthenticationError",
     "EveOnlineClient",
     "EveOnlineConnectionError",
