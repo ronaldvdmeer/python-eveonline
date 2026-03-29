@@ -406,3 +406,18 @@ def loyalty_points_data():
             "loyalty_points": 450,
         },
     ]
+
+
+@pytest.fixture
+def killmails_data():
+    """Mock response for GET /characters/{character_id}/killmails/recent/."""
+    return [
+        {
+            "killmail_id": 112830692,
+            "killmail_hash": "a01f278642069a91c09009da6d4b0e0e4c6f9b20",
+        },
+        {
+            "killmail_id": 112830693,
+            "killmail_hash": "b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0",
+        },
+    ]

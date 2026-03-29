@@ -455,3 +455,20 @@ class LoyaltyPoints:
 
     corporation_id: int
     loyalty_points: int
+
+
+@dataclass(frozen=True, slots=True)
+class CharacterKillmail:
+    """A killmail reference from a character's recent kill/loss history (requires auth).
+
+    This represents a reference to a killmail, not the full killmail detail.
+    Use the ``killmail_id`` and ``killmail_hash`` to fetch the full killmail
+    from ``GET /killmails/{killmail_id}/{killmail_hash}/`` if needed.
+
+    Attributes:
+        killmail_id: Unique killmail identifier.
+        killmail_hash: Hash string required to fetch the full killmail detail.
+    """
+
+    killmail_id: int
+    killmail_hash: str
