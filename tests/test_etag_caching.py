@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import time
+from datetime import UTC, datetime
+from email.utils import formatdate
+
 import aiohttp
 import pytest
 from aioresponses import aioresponses
@@ -540,3 +544,110 @@ class TestETagEdgeCases:
         assert result.players == 5000
         cache_key = client._etag_key("status/", {"datasource": "tranquility"}, authenticated=False)
         assert client._etag_cache[cache_key][2] == 1
+
+
+class TestExpiresTTLCaching:
+    """Expires/TTL caching: skip HTTP when cached data is still fresh."""
+
+    @pytest.mark.asyncio
+    async def test_expires_stored_in_cache(self):
+        """A valid Expires header is parsed and stored as expires_at in the cache."""
+        future_expires = formatdate(time.time() + 3600, usegmt=True)
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                payload=_SERVER_STATUS,
+                headers={"ETag": '"abc"', "Expires": future_expires},
+            )
+            async with aiohttp.ClientSession() as session:
+                client = EveOnlineClient(session=session)
+                await client.async_get_server_status()
+
+        cache_key = client._etag_key("status/", {"datasource": "tranquility"}, authenticated=False)
+        expires_at = client._etag_cache[cache_key][3]
+        assert isinstance(expires_at, datetime)
+        assert expires_at > datetime.now(UTC)
+
+    @pytest.mark.asyncio
+    async def test_fresh_cache_skips_http_request(self):
+        """A cached entry with Expires in the future is returned without making an HTTP request."""
+        future_expires = formatdate(time.time() + 3600, usegmt=True)
+        url = f"{ESI_BASE_URL}/status/?datasource=tranquility"
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+
+            with aioresponses() as mocked:
+                mocked.get(
+                    url,
+                    payload=_SERVER_STATUS,
+                    headers={"ETag": '"abc"', "Expires": future_expires},
+                )
+                result1 = await client.async_get_server_status()
+                # Second call — no additional mock registered; must be served from cache.
+                result2 = await client.async_get_server_status()
+
+        assert result1 == result2
+
+    @pytest.mark.asyncio
+    async def test_expired_cache_sends_etag_request(self):
+        """A cache entry with an expired Expires falls through to the ETag/If-None-Match flow."""
+        past_expires = formatdate(time.time() - 3600, usegmt=True)
+        async with aiohttp.ClientSession() as session:
+            client = EveOnlineClient(session=session)
+
+            with aioresponses() as mocked:
+                mocked.get(
+                    f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                    payload=_SERVER_STATUS,
+                    headers={"ETag": '"abc"', "Expires": past_expires},
+                )
+                await client.async_get_server_status()
+
+            # TTL expired — expect an ETag request; ESI responds 304.
+            with aioresponses() as mocked:
+                mocked.get(
+                    f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                    status=304,
+                )
+                result = await client.async_get_server_status()
+
+            # Verify that an HTTP request was made with the stored ETag.
+            assert mocked.requests, "Expected an HTTP request after cache expiry"
+            (_method, _url), calls = next(iter(mocked.requests.items()))
+            assert _method == "GET"
+            sent_headers = calls[0].kwargs.get("headers") or {}
+            assert sent_headers.get("If-None-Match") == '"abc"'
+
+        assert result.players == _SERVER_STATUS["players"]
+
+    @pytest.mark.asyncio
+    async def test_malformed_expires_stores_none(self):
+        """An unparseable Expires header stores None rather than raising."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                payload=_SERVER_STATUS,
+                headers={"ETag": '"abc"', "Expires": "not-a-valid-date"},
+            )
+            async with aiohttp.ClientSession() as session:
+                client = EveOnlineClient(session=session)
+                await client.async_get_server_status()
+
+        cache_key = client._etag_key("status/", {"datasource": "tranquility"}, authenticated=False)
+        assert client._etag_cache[cache_key][3] is None
+
+    @pytest.mark.asyncio
+    async def test_no_expires_header_stores_none(self):
+        """A response without an Expires header stores None as expires_at."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                payload=_SERVER_STATUS,
+                headers={"ETag": '"abc"'},
+            )
+            async with aiohttp.ClientSession() as session:
+                client = EveOnlineClient(session=session)
+                await client.async_get_server_status()
+
+        cache_key = client._etag_key("status/", {"datasource": "tranquility"}, authenticated=False)
+        assert client._etag_cache[cache_key][3] is None

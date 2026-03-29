@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import contextlib
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Any, overload
 
 from aiohttp import ClientSession
@@ -88,8 +90,8 @@ class EveOnlineClient:
         """
         self._auth = auth
         self._host = host
-        # ETag cache: maps cache_key -> (etag, cached_response_data, x_pages)
-        self._etag_cache: dict[str, tuple[str, Any, int]] = {}
+        # ETag cache: maps cache_key -> (etag, cached_response_data, x_pages, expires_at)
+        self._etag_cache: dict[str, tuple[str, Any, int, datetime | None]] = {}
 
         if auth is not None:
             self._session = auth.websession
@@ -137,7 +139,7 @@ class EveOnlineClient:
         return {}
 
     def _store_etag(self, method: str, cache_key: str, response: Any, data: Any, *, x_pages: int = 1) -> None:
-        """Cache the ETag from a successful GET response.
+        """Cache the ETag and expiry from a successful GET response.
 
         Args:
             method: HTTP method (only ``"GET"`` responses are cached).
@@ -148,7 +150,32 @@ class EveOnlineClient:
         """
         etag = response.headers.get("ETag")
         if method == "GET" and etag:
-            self._etag_cache[cache_key] = (etag, data, x_pages)
+            self._etag_cache[cache_key] = (
+                etag,
+                data,
+                x_pages,
+                self._parse_expires(response),
+            )
+
+    @staticmethod
+    def _parse_expires(response: Any) -> datetime | None:
+        """Parse the ``Expires`` header into a timezone-aware datetime.
+
+        Args:
+            response: The aiohttp response object.
+
+        Returns:
+            A timezone-aware :class:`datetime` from the ``Expires`` header, or
+            ``None`` if the header is absent or cannot be parsed.
+        """
+        if not (expires_str := response.headers.get("Expires")):
+            return None
+        with contextlib.suppress(TypeError, ValueError):
+            parsed: datetime = parsedate_to_datetime(expires_str)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=UTC)
+            return parsed
+        return None
 
     @staticmethod
     def _parse_retry_after(response: Any) -> int | None:
@@ -168,14 +195,62 @@ class EveOnlineClient:
         except ValueError:
             return None
 
+    def _get_fresh_cached(self, method: str, cache_key: str) -> tuple[Any, int] | None:
+        """Return cached ``(data, x_pages)`` if the entry is still within its TTL.
+
+        Args:
+            method: HTTP method (only ``"GET"`` cache entries are considered).
+            cache_key: Cache key produced by :meth:`_etag_key`.
+
+        Returns:
+            A ``(data, x_pages)`` tuple if a fresh cache entry exists,
+            or ``None`` if the cache is empty, expired, or the method is not GET.
+        """
+        if method != "GET":
+            return None
+        cached = self._etag_cache.get(cache_key)
+        if cached is None or cached[3] is None:
+            return None
+        if datetime.now(UTC) < cached[3]:
+            return cached[1], cached[2]
+        return None
+
+    async def _finalize_response(self, method: str, cache_key: str, response: Any) -> tuple[Any, int]:
+        """Parse the response JSON, store ETag/Expires, and return ``(data, x_pages)``.
+
+        Used for any successful 2xx response. ETag/Expires-based caching is only
+        applied for ``GET`` requests (see :meth:`_store_etag`).
+
+        Args:
+            method: HTTP method used for the request.
+            cache_key: Cache key produced by :meth:`_etag_key`.
+            response: The aiohttp response object for a successful 2xx response.
+
+        Returns:
+            A ``(data, x_pages)`` tuple ready to be returned by the caller.
+        """
+        data = await response.json()
+        try:
+            x_pages = int(response.headers.get("X-Pages", "1"))
+        except (TypeError, ValueError):
+            x_pages = 1
+        self._store_etag(method, cache_key, response, data, x_pages=x_pages)
+        return data, x_pages
+
     async def _request_full(
         self, method: str, path: str, *, authenticated: bool = False, **kwargs: Any
     ) -> tuple[Any, int]:
         """Make a request to the ESI API and return the data with pagination info.
 
-        GET requests use ETag caching: a cached ``ETag`` is sent as
-        ``If-None-Match``; a ``304 Not Modified`` response returns the
-        previously cached data without consuming bandwidth.
+        Two caching layers are applied for GET requests:
+
+        1. **TTL caching** — if a cache entry exists with an ``Expires`` value
+           that has not passed, the cached data is returned immediately without
+           making any HTTP request.
+        2. **ETag caching** — when the TTL has expired (or no ``Expires`` was
+           stored), a ``If-None-Match`` header is sent if a cached ETag exists.
+           A ``304 Not Modified`` response returns the previously cached data
+           without downloading a response body.
 
         Args:
             method: HTTP method.
@@ -199,6 +274,11 @@ class EveOnlineClient:
         params: dict[str, Any] = dict(kwargs.pop("params", {}) or {})
         params.setdefault("datasource", ESI_DATASOURCE)
         cache_key = self._etag_key(path, params, authenticated)
+
+        # Short-circuit if the cached data is still fresh (Expires not yet reached).
+        if (fresh := self._get_fresh_cached(method, cache_key)) is not None:
+            return fresh
+
         headers = {**dict(kwargs.pop("headers", {}) or {}), **self._build_etag_headers(method, cache_key)}
 
         try:
@@ -228,6 +308,7 @@ class EveOnlineClient:
 
         if response.status == 304:
             # Not Modified — return the data we cached earlier if it still exists.
+            # Also refresh the Expires timestamp if the server sent an updated one.
             response.release()
             if (cached := self._etag_cache.get(cache_key)) is None:
                 msg = (
@@ -235,6 +316,8 @@ class EveOnlineClient:
                     f"cache entry exists for key {cache_key!r}."
                 )
                 raise EveOnlineError(msg)
+            expires_at = self._parse_expires(response) or cached[3]
+            self._etag_cache[cache_key] = (cached[0], cached[1], cached[2], expires_at)
             return cached[1], cached[2]
 
         if response.status == 404:
@@ -251,13 +334,7 @@ class EveOnlineClient:
             msg = f"ESI API error ({response.status}): {text}"
             raise EveOnlineError(msg)
 
-        data = await response.json()
-        try:
-            x_pages = int(response.headers.get("X-Pages", "1"))
-        except (TypeError, ValueError):
-            x_pages = 1
-        self._store_etag(method, cache_key, response, data, x_pages=x_pages)
-        return data, x_pages
+        return await self._finalize_response(method, cache_key, response)
 
     async def _request(self, method: str, path: str, *, authenticated: bool = False, **kwargs: Any) -> Any:
         """Make a request to the ESI API.
