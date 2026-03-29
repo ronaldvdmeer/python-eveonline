@@ -148,6 +148,24 @@ class EveOnlineClient:
         if method == "GET" and etag:
             self._etag_cache[cache_key] = (etag, data)
 
+    @staticmethod
+    def _parse_retry_after(response: Any) -> int | None:
+        """Extract the Retry-After delay in seconds from a rate-limit response.
+
+        Args:
+            response: The aiohttp response object.
+
+        Returns:
+            The delay in seconds, or ``None`` if the header is absent or
+            cannot be parsed as an integer.
+        """
+        if (retry_after := response.headers.get("Retry-After")) is None:
+            return None
+        try:
+            return int(retry_after)
+        except ValueError:
+            return None
+
     async def _request(self, method: str, path: str, *, authenticated: bool = False, **kwargs: Any) -> Any:
         """Make a request to the ESI API.
 
@@ -203,22 +221,22 @@ class EveOnlineClient:
             raise EveOnlineAuthenticationError(msg)
 
         if response.status == 304:
-            # Not Modified — return the data we cached earlier.
-            return self._etag_cache[cache_key][1]
+            # Not Modified — return the data we cached earlier if it still exists.
+            await response.release()
+            if (cached := self._etag_cache.get(cache_key)) is None:
+                msg = (
+                    f"Received 304 Not Modified from ESI, but no matching ETag "
+                    f"cache entry exists for key {cache_key!r}."
+                )
+                raise EveOnlineError(msg)
+            return cached[1]
 
         if response.status == 404:
             msg = f"Resource not found: {path}"
             raise EveOnlineNotFoundError(msg)
 
         if response.status in (420, 429):
-            retry_after = response.headers.get("Retry-After")
-            retry_after_seconds: int | None = None
-            if retry_after is not None:
-                try:
-                    retry_after_seconds = int(retry_after)
-                except ValueError:
-                    retry_after_seconds = None
-            raise EveOnlineRateLimitError(retry_after=retry_after_seconds)
+            raise EveOnlineRateLimitError(retry_after=self._parse_retry_after(response))
 
         if response.status >= 400:
             text = await response.text()

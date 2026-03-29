@@ -195,6 +195,19 @@ class TestETagCaching:
 
         assert second.balance == first.balance
 
+    @pytest.mark.asyncio
+    async def test_304_without_cache_entry_raises_error(self):
+        """A 304 response with no matching cache entry raises EveOnlineError."""
+        with aioresponses() as mocked:
+            mocked.get(
+                f"{ESI_BASE_URL}/status/?datasource=tranquility",
+                status=304,
+            )
+            async with aiohttp.ClientSession() as session:
+                client = EveOnlineClient(session=session)
+                with pytest.raises(EveOnlineError, match="304 Not Modified"):
+                    await client.async_get_server_status()
+
 
 class TestETagIfNoneMatch:
     """Verify that the If-None-Match header is actually sent."""
