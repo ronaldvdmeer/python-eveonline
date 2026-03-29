@@ -168,6 +168,19 @@ async def test_character_portrait_live(public_client: EveOnlineClient) -> None:
             assert url.startswith("https://"), f"Portrait URL must be HTTPS, got: {url}"
 
 
+@pytest.mark.integration
+async def test_corporation_public_live(public_client: EveOnlineClient) -> None:
+    """Public corporation info returns name, ticker, member count and tax rate."""
+    char = await public_client.async_get_character_public(_CHARACTER_ID)
+    corp = await public_client.async_get_corporation_public(char.corporation_id)
+
+    assert corp.name, "Corporation name must be non-empty"
+    assert corp.ticker, "Ticker must be non-empty"
+    assert corp.member_count >= 0, "Member count must be non-negative"
+    assert corp.ceo_id > 0, "CEO character ID must be positive"
+    assert 0.0 <= corp.tax_rate <= 1.0, f"Tax rate {corp.tax_rate} must be between 0.0 and 1.0"
+
+
 # ===========================================================================
 # Authenticated endpoint tests — require ESI_TOKEN
 # ===========================================================================
@@ -205,10 +218,15 @@ async def test_skills_live(auth_client: EveOnlineClient) -> None:
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_skill_queue_live(auth_client: EveOnlineClient) -> None:
-    """Skill queue returns a list (may be empty if nothing is training)."""
+    """Skill queue returns a list; non-empty entries have valid skill ID and queue position."""
     queue = await auth_client.async_get_skill_queue(_AUTH_CHARACTER_ID)
 
     assert isinstance(queue, list)
+    if queue:
+        entry = queue[0]
+        assert entry.skill_id > 0, "Skill ID must be positive"
+        assert entry.queue_position >= 0, "Queue position must be non-negative"
+        assert entry.finished_level in range(1, 6), "Finished level must be 1-5"
 
 
 @pytest.mark.integration
@@ -243,28 +261,49 @@ async def test_mail_labels_live(auth_client: EveOnlineClient) -> None:
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_market_orders_live(auth_client: EveOnlineClient) -> None:
-    """Market orders returns a list (may be empty)."""
+    """Market orders returns a list; non-empty entries have valid order fields."""
     orders = await auth_client.async_get_market_orders(_AUTH_CHARACTER_ID)
 
     assert isinstance(orders, list)
+    if orders:
+        order = orders[0]
+        assert order.order_id > 0, "Order ID must be positive"
+        assert order.type_id > 0, "Type ID must be positive"
+        assert order.price > 0, "Order price must be positive"
+        assert order.volume_remain >= 0, "Remaining volume must be non-negative"
+        assert order.duration > 0, "Duration must be positive"
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_industry_jobs_live(auth_client: EveOnlineClient) -> None:
-    """Industry jobs returns a list (may be empty)."""
+    """Industry jobs returns a list; non-empty entries have valid job fields."""
     jobs = await auth_client.async_get_industry_jobs(_AUTH_CHARACTER_ID)
 
     assert isinstance(jobs, list)
+    if jobs:
+        job = jobs[0]
+        assert job.job_id > 0, "Job ID must be positive"
+        assert job.activity_id > 0, "Activity ID must be positive"
+        assert job.status, "Job status must be non-empty"
+        assert job.blueprint_type_id > 0, "Blueprint type ID must be positive"
+        assert job.runs > 0, "Runs must be positive"
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_notifications_live(auth_client: EveOnlineClient) -> None:
-    """Notifications returns a list (may be empty)."""
+    """Notifications returns a list; non-empty entries have valid notification fields."""
     notifications = await auth_client.async_get_notifications(_AUTH_CHARACTER_ID)
 
     assert isinstance(notifications, list)
+    if notifications:
+        notif = notifications[0]
+        assert notif.notification_id > 0, "Notification ID must be positive"
+        assert notif.sender_id > 0, "Sender ID must be positive"
+        assert notif.sender_type, "Sender type must be non-empty"
+        assert notif.type, "Notification type must be non-empty"
+        assert notif.timestamp is not None, "Timestamp must be set"
 
 
 @pytest.mark.integration
@@ -290,37 +329,61 @@ async def test_implants_live(auth_client: EveOnlineClient) -> None:
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_wallet_journal_live(auth_client: EveOnlineClient) -> None:
-    """Wallet journal returns a list of entries (may be empty for new chars)."""
+    """Wallet journal returns a list; non-empty entries have valid journal fields."""
     journal = await auth_client.async_get_wallet_journal(_AUTH_CHARACTER_ID)
 
     assert isinstance(journal, list)
+    if journal:
+        entry = journal[0]
+        assert entry.id > 0, "Journal entry ID must be positive"
+        assert entry.ref_type, "ref_type must be non-empty"
+        assert entry.date is not None, "Journal entry date must be set"
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_contacts_live(auth_client: EveOnlineClient) -> None:
-    """Contacts returns a list (may be empty)."""
+    """Contacts returns a list; non-empty entries have valid contact fields."""
     contacts = await auth_client.async_get_contacts(_AUTH_CHARACTER_ID)
 
     assert isinstance(contacts, list)
+    if contacts:
+        contact = contacts[0]
+        assert contact.contact_id > 0, "Contact ID must be positive"
+        assert contact.contact_type in (
+            "character",
+            "corporation",
+            "alliance",
+            "faction",
+        ), f"Unexpected contact type: {contact.contact_type}"
+        assert -10.0 <= contact.standing <= 10.0, f"Standing {contact.standing} out of range"
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_calendar_live(auth_client: EveOnlineClient) -> None:
-    """Calendar events returns a list (may be empty)."""
+    """Calendar events returns a list; non-empty entries have valid event fields."""
     events = await auth_client.async_get_calendar(_AUTH_CHARACTER_ID)
 
     assert isinstance(events, list)
+    if events:
+        event = events[0]
+        assert event.event_id > 0, "Event ID must be positive"
+        assert event.title, "Event title must be non-empty"
+        assert event.event_date is not None, "Event date must be set"
 
 
 @pytest.mark.integration
 @NEEDS_TOKEN
 async def test_loyalty_points_live(auth_client: EveOnlineClient) -> None:
-    """Loyalty points returns a list of LP entries (may be empty)."""
+    """Loyalty points returns a list; non-empty entries have positive corporation ID and LP."""
     lp = await auth_client.async_get_loyalty_points(_AUTH_CHARACTER_ID)
 
     assert isinstance(lp, list)
+    if lp:
+        entry = lp[0]
+        assert entry.corporation_id > 0, "Corporation ID must be positive"
+        assert entry.loyalty_points >= 0, "Loyalty points must be non-negative"
 
 
 @pytest.mark.integration
@@ -331,3 +394,81 @@ async def test_jump_fatigue_live(auth_client: EveOnlineClient) -> None:
 
     # Fatigue fields are all optional — just check the call succeeds
     _ = fatigue
+
+
+@pytest.mark.integration
+@NEEDS_TOKEN
+async def test_killmails_live(auth_client: EveOnlineClient) -> None:
+    """Killmails returns a list; non-empty entries have a positive ID and non-empty hash."""
+    killmails = await auth_client.async_get_killmails(_AUTH_CHARACTER_ID)
+
+    assert isinstance(killmails, list)
+    if killmails:
+        km = killmails[0]
+        assert km.killmail_id > 0, "Killmail ID must be positive"
+        assert km.killmail_hash, "Killmail hash must be non-empty"
+
+
+# ===========================================================================
+# Caching behaviour tests — ETag and TTL/Expires round-trips
+# ===========================================================================
+
+
+@pytest.mark.integration
+async def test_etag_caching_round_trip_live(public_client: EveOnlineClient) -> None:
+    """Repeated requests to the same endpoint succeed with ETag/TTL caching active.
+
+    The second call may trigger a 304 (data served from cache) or return a
+    fresh 200.  Both paths must return a structurally valid model.
+    After clearing the cache a third request must still succeed.
+    """
+    first = await public_client.async_get_server_status()
+    assert first.players >= 0
+    assert first.server_version
+
+    # Second call: exercises the conditional-request (ETag) or TTL short-circuit path.
+    second = await public_client.async_get_server_status()
+    assert second.players >= 0
+    assert second.server_version == first.server_version, "Server version should be consistent within the same session"
+
+    # After an explicit cache clear the client must make a fresh request.
+    public_client.clear_etag_cache()
+    third = await public_client.async_get_server_status()
+    assert third.players >= 0
+
+
+@pytest.mark.integration
+async def test_etag_cache_populated_after_request_live(public_client: EveOnlineClient) -> None:
+    """A completed GET request populates the internal ETag cache.
+
+    This test intentionally inspects ``_etag_cache`` (a private attribute) to
+    verify that ESI actually returns ETag headers for this endpoint.  There is
+    no public API to observe cache state other than ``clear_etag_cache()``.
+    """
+    public_client.clear_etag_cache()  # start from a known empty state
+    await public_client.async_get_server_status()
+
+    assert public_client._etag_cache, (
+        "ETag cache must be non-empty after a GET request — ESI may not be returning ETag headers"
+    )
+
+
+@pytest.mark.integration
+async def test_expires_header_sets_ttl_in_cache_live(public_client: EveOnlineClient) -> None:
+    """ESI Expires header is parsed and stored as a TTL in the cache entry.
+
+    This test intentionally inspects ``_etag_cache`` (a private attribute)
+    because the expires_at value has no public accessor.  The check verifies
+    that the two-tier caching (TTL layer + ETag layer) is correctly wired to
+    live ESI responses.
+    """
+    public_client.clear_etag_cache()
+    await public_client.async_get_server_status()
+
+    if not public_client._etag_cache:
+        pytest.skip("ESI did not return an ETag for server status — cannot inspect TTL")
+
+    cache_entry = next(iter(public_client._etag_cache.values()))
+    # cache_entry is (etag, data, x_pages, expires_at)
+    expires_at = cache_entry[3]
+    assert expires_at is not None, "ESI should send an Expires header for server status — expires_at must not be None"
