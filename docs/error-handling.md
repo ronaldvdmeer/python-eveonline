@@ -99,4 +99,10 @@ ESI endpoints each have a server-side cache duration. Fetching within the cache 
 | `/characters/{id}/orders/` | 1200 seconds |
 | `/universe/names/` | 3600 seconds |
 
-The library does **not** cache responses client-side. Consider polling at intervals aligned with these cache times to avoid redundant fetches.
+The client uses two layers of caching to minimise ESI traffic:
+
+1. **TTL caching (`Expires` header)** — ESI returns an `Expires` header on every response. The client stores this alongside the cached data. If you call the same endpoint again before that time is reached, the client returns the cached result immediately without making any HTTP request. This protects your ESI error quota most effectively.
+
+2. **ETag caching (`If-None-Match` / 304)** — Once the `Expires` time has passed (or was absent), the client sends the stored `ETag` in an `If-None-Match` header. If the data has not changed, ESI returns `304 Not Modified` and the client returns the previously cached data without downloading a response body.
+
+Use `client.clear_etag_cache()` to discard both layers and force fresh responses on the next requests.
