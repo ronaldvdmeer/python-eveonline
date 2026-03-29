@@ -13,7 +13,7 @@ Built for use with [Home Assistant](https://www.home-assistant.io/) but can be u
 
 - **Fully async** — built on [aiohttp](https://docs.aiohttp.org/)
 - **Typed models** — all API responses are frozen dataclasses with full type annotations
-- **23 endpoints** — public (server, character, corporation, universe) and authenticated (wallet, skills, location, industry, market, mail, notifications, clones, contacts, calendar, loyalty, killmails)
+- **23 endpoints** — public (server, character, corporation, universe) and authenticated (wallet, skills, location, industry, market, mail, notifications, clones, fatigue, contacts, calendar, loyalty, killmails)
 - **Abstract auth** — implement `AbstractAuth` to plug in any OAuth2 token source
 - **Type-safe** — PEP 561 compatible (`py.typed`), strict mypy configuration
 - **Tested** — ≥98% test coverage

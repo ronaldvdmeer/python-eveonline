@@ -124,9 +124,23 @@ All authenticated endpoints require `EveOnlineClient(auth=...)`. See [Authentica
 
 ### Pagination
 
-Some ESI endpoints return data across multiple pages. The client handles this automatically using the `X-Pages` response header: it fetches page 1, reads the total page count, then sequentially fetches any remaining pages and returns a single combined list. No extra code is needed — just call the method as usual.
+Some ESI endpoints return data across multiple pages. The client handles this automatically:
 
-Endpoints that use automatic pagination are marked with *all pages fetched automatically* in their return type description.
+1. It fetches page 1 and reads the `X-Pages` response header to determine the total page count.
+2. It sequentially fetches any remaining pages.
+3. All pages are merged into a single list before returning.
+
+No extra code is needed — just call the method as usual.
+
+Endpoints with automatic pagination:
+
+| Method | Max items per page |
+|---|---|
+| `async_get_wallet_journal()` | 50 |
+| `async_get_contacts()` | 500 |
+| `async_get_killmails()` | 50 |
+
+Endpoints that use automatic pagination are also marked with *all pages fetched automatically* in their return type description below.
 
 ---
 
@@ -514,3 +528,53 @@ for km in killmails:
 |---|---|---|
 | `killmail_id` | `int` | Unique killmail identifier |
 | `killmail_hash` | `str` | Hash required to fetch the full killmail detail |
+
+---
+
+## Client utilities
+
+### `clear_etag_cache()`
+
+Discards all cached responses (both TTL and ETag layers) so the next request to each endpoint fetches fresh data from ESI.
+
+```python
+client.clear_etag_cache()
+```
+
+Useful when you need up-to-date data immediately, regardless of the remaining cache lifetime.
+
+---
+
+## Request caching
+
+The client uses two automatic caching layers to reduce ESI traffic. Caching is active when a GET endpoint returns an `ETag` header — which is true for all endpoints documented here.
+
+### Layer 1 — TTL (`Expires` header)
+
+When ESI returns an `Expires` header, the client stores the expiry timestamp alongside the cached data. A repeat call before that time returns the cached result immediately **without making any HTTP request**.
+
+```python
+# First call — real HTTP request, Expires stored
+status = await client.async_get_server_status()
+
+# Second call within TTL window — no HTTP request, cache returned instantly
+status = await client.async_get_server_status()
+```
+
+ESI cache durations vary by endpoint. Common values:
+
+| Endpoint | Cache duration |
+|---|---|
+| `/status/` | 30 seconds |
+| `/characters/{id}/online/` | 60 seconds |
+| `/characters/{id}/wallet/` | 120 seconds |
+| `/characters/{id}/skills/` | 120 seconds |
+| `/characters/{id}/industry/jobs/` | 300 seconds |
+| `/characters/{id}/orders/` | 1200 seconds |
+| `/universe/names/` | 3600 seconds |
+
+### Layer 2 — ETag (`If-None-Match` / 304)
+
+Once the TTL has expired (or if no `Expires` header was present), the client sends the stored `ETag` value in an `If-None-Match` request header. If the data has not changed since it was last fetched, ESI responds with `304 Not Modified` and the client returns the previously cached data **without downloading a response body**.
+
+Both layers are fully transparent — no configuration is needed. Use `clear_etag_cache()` to bypass them when fresh data is required.

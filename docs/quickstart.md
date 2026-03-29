@@ -89,3 +89,31 @@ location = await client.async_get_character_location(character_id)
 print(location.solar_system_id)  # always present
 print(location.station_id)       # int | None — None when in space
 ```
+
+## Automatic pagination
+
+Some endpoints return large datasets across multiple pages. The client fetches all pages automatically and returns a single combined list:
+
+```python
+# Fetches all pages automatically — no manual paging needed
+journal = await client.async_get_wallet_journal(character_id)
+print(f"{len(journal)} journal entries total")
+```
+
+Paginated endpoints: `async_get_wallet_journal()`, `async_get_contacts()`, `async_get_killmails()`.
+
+## Request caching
+
+The client caches ESI responses automatically using two layers:
+
+1. **TTL** — If ESI returns an `Expires` header, repeated calls before that time skip the HTTP request entirely.
+2. **ETag / 304** — Once the TTL expires, the client sends `If-None-Match`. If the data is unchanged, ESI returns `304 Not Modified` and no response body is downloaded.
+
+Both layers are transparent and require no configuration. To force fresh data, call `clear_etag_cache()`:
+
+```python
+client.clear_etag_cache()
+status = await client.async_get_server_status()  # fresh request
+```
+
+See [Endpoints](endpoints.md#request-caching) for the full caching reference.
