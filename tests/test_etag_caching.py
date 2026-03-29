@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 from email.utils import formatdate
 
 import aiohttp
@@ -566,7 +566,7 @@ class TestExpiresTTLCaching:
         cache_key = client._etag_key("status/", {"datasource": "tranquility"}, authenticated=False)
         expires_at = client._etag_cache[cache_key][3]
         assert isinstance(expires_at, datetime)
-        assert expires_at > datetime.now(timezone.utc)
+        assert expires_at > datetime.now(UTC)
 
     @pytest.mark.asyncio
     async def test_fresh_cache_skips_http_request(self):
